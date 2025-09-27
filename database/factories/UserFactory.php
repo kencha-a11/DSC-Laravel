@@ -25,20 +25,24 @@ class UserFactory extends Factory
     {
         return [
             // general factory
-            // 'name' => fake()->name(),
-            // 'email' => fake()->unique()->safeEmail(),
-            // 'email_verified_at' => now(),
-            // 'password' => static::$password ??= Hash::make('password'),
-            // 'role' => fake()->randomElement(['user', 'admin']),
-            // 'remember_token' => Str::random(10),
-
-            // single specific user
-            'name' => 'John Doe',
-            'email' => 'john@example.com',
+            'name' => fake()->name(),
+            'email' => fake()->unique()->safeEmail(),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
-            'role' => 'admin',
+            'role' => fake()->randomElement(['user', 'admin']),
+            'active_status' => fake()->randomElement(['active', 'inactive']),
+            'account_status' => fake()->randomElement(['activated', 'deactivated']),
             'remember_token' => Str::random(10),
+
+            // generate admin user
+            // 'name' => 'John Doe',
+            // 'email' => 'john@example.com',
+            // 'email_verified_at' => now(),
+            // 'password' => static::$password ??= Hash::make('password'),
+            // 'role' => 'admin',
+            // 'active_status' => 'active',
+            // 'account_status' => 'activated',
+            // 'remember_token' => Str::random(10),
         ];
     }
 
