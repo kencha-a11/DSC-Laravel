@@ -20,8 +20,8 @@ class SaleItemFactory extends Factory
             'sale_id' => \App\Models\Sale::factory(),
             'product_id' => \App\Models\Product::factory(),
             'quantity' => $this->faker->numberBetween(1, 5),
-            'quantity' => $this->faker->randomFloat(2, 1, 100),
-            'subtotal' => $this->faker->randomFloat(2, 1, 100),
+            'price' => $this->faker->randomFloat(2, 1, 100),
+            'subtotal' => $this->faker->randomFloat(2, 20, 500),
         ];
     }
 }

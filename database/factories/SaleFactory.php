@@ -14,11 +14,12 @@ class SaleFactory extends Factory
      *
      * @return array<string, mixed>
      */
-    public function definition(): array
-    {
-        return [
-            'user_id' => \App\Models\User::factory(),
-            'total_amount' => $this->faker->randomFloat(2, 10, 500),
-        ];
-    }
+public function definition(): array
+{
+    return [
+        'user_id' => \App\Models\User::factory(),
+        'total_amount' => $this->faker->randomFloat(2, 50, 1000),
+    ];
+}
+
 }

@@ -17,11 +17,15 @@ return [
 
     'paths' => ['api/*', 'sanctum/csrf-cookie'],
 
-    'allowed_methods' => ['*'], // all http methods (get, post, put, patch, delete etc)
+    'allowed_methods' => ['*'],
 
-    'allowed_origins' => [ // changes
+    'allowed_origins' => [
+        'http://localhost:3000',
         'http://localhost:5173',
-        'http://127.0.0.1:8000',
+        'http://localhost:5174',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:5173',
+        'http://127.0.0.1:5174',
     ],
 
     'allowed_origins_patterns' => [],
@@ -32,6 +36,6 @@ return [
 
     'max_age' => 0,
 
-    'supports_credentials' => true, //changes
+    'supports_credentials' => true,
 
 ];

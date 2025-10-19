@@ -13,13 +13,23 @@ class Sale extends Model
         'total_amount',
     ];
 
+    protected $casts = [
+        'total_amount' => 'decimal:2',
+    ];
+
     public function user()
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(\App\Models\User::class);
     }
 
-    public function sale_items()
+    public function saleItems()
     {
-        return $this->hasMany(SaleItem::class);
+        return $this->hasMany(\App\Models\SaleItem::class);
     }
+
+    public function saleItemsWithProduct()
+{
+    return $this->hasMany(SaleItem::class)->with('product');
+}
+
 }

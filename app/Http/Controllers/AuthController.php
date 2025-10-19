@@ -6,36 +6,77 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Facades\Log;
+use App\Models\TimeLog;
+
 
 class AuthController extends Controller
 {
     public function login(Request $request)
     {
-        $credentials = $request->validate([
+        $request->validate([
             'email' => 'required|email',
             'password' => 'required',
         ]);
 
-        $user = User::where('email', $credentials['email'])->first();
+        if (Auth::attempt($request->only('email', 'password'))) {
+            $request->session()->regenerate();
 
-        if (! $user || ! Hash::check($credentials['password'], $user->password)) {
-            return response()->json(['message' => 'Invalid credentials'], 401);
+            return response()->json([
+                'message' => 'Login successful',
+                'user' => Auth::user()
+            ]);
         }
 
-        $token = $user->createToken('api_token')->plainTextToken;
-
-        return response()->json([
-            'message' => 'Login successful',
-            'token' => $token,
-            'user' => $user,
+        throw ValidationException::withMessages([
+            'email' => ['The provided credentials are incorrect.'],
         ]);
     }
 
-    public function logout(Request $request)
-    {
-        // revoke only current token
-        $request->user()->currentAccessToken()->delete();
+public function logout(Request $request)
+{
+    $user = $request->user();
 
-        return response()->json(['message' => 'Logged out']);
+    if ($user) {
+        Log::info("Manual logout requested for user ID: {$user->id}");
+
+        // Fire the logout event manually to trigger your listener
+        event(new \Illuminate\Auth\Events\Logout('web', $user));
+    }
+
+    // Properly log out from web guard
+    Auth::guard('web')->logout();
+
+    // Invalidate session
+    $request->session()->invalidate();
+    $request->session()->regenerateToken();
+
+    // Clear Sanctum cookies
+    return response()
+        ->json(['message' => 'Logout successful'])
+        ->withCookie(cookie()->forget('laravel_session'))
+        ->withCookie(cookie()->forget('XSRF-TOKEN'));
+}
+
+
+
+
+    public function user(Request $request)
+    {
+        if (!$request->user()) {
+            return response()->json(['message' => 'Unauthenticated.'], 401);
+        }
+
+        return response()->json($request->user());
+    }
+
+
+    public function profile(Request $request)
+    {
+        return response()->json([
+            'user' => $request->user(),
+            'extra' => 'You can add more user-related info here'
+        ]);
     }
 }

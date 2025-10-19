@@ -8,33 +8,30 @@ use Illuminate\Database\Eloquent\Model;
 class Product extends Model
 {
     use HasFactory;
+
     protected $fillable = [
         'name',
         'price',
-        'category_id',
         'stock_quantity',
         'low_stock_threshold',
+        'status',
     ];
 
-    public function category()
+    // Many-to-many categories
+    public function categories()
     {
-        return $this->belongsTo(Category::class);
+        return $this->belongsToMany(Category::class, 'category_product', 'product_id', 'category_id');
     }
 
-    public function sale_items()
+
+    public function saleItems()
     {
         return $this->hasMany(SaleItem::class);
     }
 
-    // public function images()
-    // {
-    //     return $this->hasMany(\App\Models\ProductImage::class, 'product_id', 'id');
-    // }
-
     public function images_path()
     {
-        return $this->hasMany(\App\Models\ProductImage::class, 'product_id', 'id');
+        return $this->hasMany(ProductImage::class, 'product_id', 'id');
     }
-
-
 }
+

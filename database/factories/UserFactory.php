@@ -24,16 +24,15 @@ class UserFactory extends Factory
     public function definition(): array
     {
         return [
-            // general factory
-            'name' => fake()->name(),
-            'email' => fake()->unique()->safeEmail(),
+            'name' => $this->faker->name(),
+            'email' => $this->faker->unique()->safeEmail(),
             'email_verified_at' => now(),
-            'password' => static::$password ??= Hash::make('password'),
-            'role' => fake()->randomElement(['user', 'admin']),
-            'active_status' => fake()->randomElement(['active', 'inactive']),
-            'account_status' => fake()->randomElement(['activated', 'deactivated']),
+            'password' => Hash::make('password'), // hashed
+            'role' => $this->faker->randomElement(['user', 'admin']),
+            'active_status' => $this->faker->randomElement(['active', 'inactive']),
+            'account_status' => $this->faker->randomElement(['activated', 'deactivated']),
             'remember_token' => Str::random(10),
-
+            
             // generate admin user
             // 'name' => 'John Doe',
             // 'email' => 'john@example.com',
@@ -51,7 +50,7 @@ class UserFactory extends Factory
      */
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
+        return $this->state(fn(array $attributes) => [
             'email_verified_at' => null,
         ]);
     }

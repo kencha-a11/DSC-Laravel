@@ -18,6 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('category_id')->nullable();
             $table->integer('stock_quantity')->default(0);
             $table->integer('low_stock_threshold')->default(0);
+            $table->enum('status', ['stock', 'low stock', 'out of stock']);
             $table->foreign('category_id')->references('id')->on('categories')->onDelete('cascade');
             $table->timestamps();
         });

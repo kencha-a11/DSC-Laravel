@@ -52,6 +52,30 @@ class User extends Authenticatable
 
     public function sales()
     {
-        return $this->hasMany(Sale::class);
+        return $this->hasMany(\App\Models\Sale::class);
+    }
+
+    /**
+     * User has many time logs
+     */
+    public function timeLogs()
+    {
+        return $this->hasMany(\App\Models\TimeLog::class);
+    }
+
+    /**
+     * User has many sales logs
+     */
+    public function salesLogs()
+    {
+        return $this->hasMany(\App\Models\SalesLog::class);
+    }
+
+    /**
+     * User has many inventory logs
+     */
+    public function inventoryLogs()
+    {
+        return $this->hasMany(\App\Models\InventoryLog::class);
     }
 }

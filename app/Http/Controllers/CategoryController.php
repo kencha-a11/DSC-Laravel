@@ -3,69 +3,114 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use App\Models\Category;
+use App\Models\Product;
 
 class CategoryController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * List all categories with products.
      */
     public function index()
-    {
-        $categories = \App\Models\Category::all();
-        return response()->json($categories);
-    }
+{
+    // Fetch all categories including those with no products
+    $categories = Category::with('products')->get();
+
+    return response()->json($categories);
+}
+
 
     /**
-     * Show the form for creating a new resource.
+     * Store a new category and attach products.
      */
-    public function create()
-    {
-        // Not applicable for an API
+    // CategoryController.php
+public function store(Request $request)
+{
+    // Trim category name for consistency
+    $request->merge(['category_name' => trim($request->category_name)]);
+
+    // Validation
+    $request->validate([
+        'category_name' => [
+            'required',
+            'string',
+            'max:255',
+            // Case-insensitive uniqueness check
+            function ($attribute, $value, $fail) {
+                $exists = \App\Models\Category::whereRaw(
+                    'LOWER(category_name) = ?', 
+                    [strtolower($value)]
+                )->exists();
+
+                if ($exists) {
+                    $fail('Category name "' . $value . '" already exists.');
+                }
+            },
+        ],
+        'products' => 'array',           // optional
+        'products.*' => 'exists:products,id',
+    ]);
+
+    // Create the category
+    $category = Category::create([
+        'category_name' => $request->category_name,
+    ]);
+
+    // Associate products if any are provided
+    if ($request->has('products')) {
+        $category->products()->sync($request->products);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        $category = \App\Models\Category::create($request->all());
-        return response()->json($category, 201);
-    }
+    // Load products with their categories for response
+    $category->load('products.categories');
+
+    // Return the newly created category
+    return response()->json($category);
+}
+
+
+
 
     /**
-     * Display the specified resource.
+     * Show a specific category with products.
      */
-    public function show(string $id)
+    public function show($id)
     {
-        $category = \App\Models\Category::find($id);
+        $category = Category::with('products')->findOrFail($id);
         return response()->json($category);
     }
 
     /**
-     * Show the form for editing the specified resource.
+     * Update category and its products.
      */
-    public function edit(string $id)
+    public function update(Request $request, $id)
     {
-        // Not applicable for an API
+        $category = Category::findOrFail($id);
+
+        $validated = $request->validate([
+            'category_name' => "sometimes|string|max:255|unique:categories,category_name,$id",
+            'products' => 'array',
+            'products.*' => 'integer|exists:products,id',
+        ]);
+
+        $category->update($validated);
+
+        if (isset($validated['products'])) {
+            $category->products()->sync($validated['products']);
+        }
+
+        return response()->json($category->load('products'));
     }
 
     /**
-     * Update the specified resource in storage.
+     * Delete a category.
      */
-    public function update(Request $request, string $id)
+    public function destroy($id)
     {
-        $category = \App\Models\Category::find($id);
-        $category->update($request->all());
-        return response()->json($category);
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        $category = \App\Models\Category::find($id);
+        $category = Category::findOrFail($id);
+        $category->products()->detach(); // remove pivot relationships
         $category->delete();
-        return response()->json(['message' => 'Category deleted']);
+
+        return response()->json(['message' => 'Category deleted successfully']);
     }
 }

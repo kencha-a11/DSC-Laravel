@@ -12,9 +12,11 @@ class UserController extends Controller
      */
     public function index()
     {
-        $users = \App\Models\User::all();
+        $users = \App\Models\User::with('sales.saleItems')->get();
+
         return response()->json($users);
     }
+
 
     /**
      * Show the form for creating a new resource.
