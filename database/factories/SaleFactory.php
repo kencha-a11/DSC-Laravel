@@ -14,12 +14,15 @@ class SaleFactory extends Factory
      *
      * @return array<string, mixed>
      */
-public function definition(): array
-{
-    return [
-        'user_id' => \App\Models\User::factory(),
-        'total_amount' => $this->faker->randomFloat(2, 50, 1000),
-    ];
-}
+    public function definition(): array
+    {
+        $created = $this->faker->dateTimeBetween('-1 years', 'now');
 
+        return [
+            'user_id' => \App\Models\User::factory(),
+            'total_amount' => $this->faker->randomFloat(2, 50, 1000),
+            'created_at' => $created,
+            'updated_at' => $this->faker->dateTimeBetween($created, 'now'),
+        ];
+    }
 }
