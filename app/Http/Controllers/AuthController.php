@@ -20,57 +20,66 @@ class AuthController extends Controller
             'password' => 'required',
         ]);
 
-        if (Auth::attempt($request->only('email', 'password'))) {
+        $credentials = $request->only('email', 'password');
+
+        // Attempt to authenticate
+        if (Auth::attempt($credentials)) {
+            $user = Auth::user();
+
+            // 🧩 Check account status
+            if ($user->account_status === 'deactivated') {
+                Auth::logout(); // ensure no session remains
+                throw ValidationException::withMessages([
+                    'email' => ['Your account is deactivated. Please contact the administrator.'],
+                ]);
+            }
+
             $request->session()->regenerate();
 
             return response()->json([
                 'message' => 'Login successful',
-                'user' => Auth::user()
+                'user' => $user,
             ]);
         }
 
+        // ❌ Invalid credentials
         throw ValidationException::withMessages([
             'email' => ['The provided credentials are incorrect.'],
         ]);
     }
 
-public function logout(Request $request)
-{
-    $user = $request->user();
+    public function logout(Request $request)
+    {
+        $user = $request->user();
 
-    if ($user) {
-        Log::info("Manual logout requested for user ID: {$user->id}");
+        if ($user) {
+            Log::info("Manual logout requested for user ID: {$user->id}");
 
-        // Fire the logout event manually to trigger your listener
-        event(new \Illuminate\Auth\Events\Logout('web', $user));
+            // Fire the logout event manually to trigger your listener
+            event(new \Illuminate\Auth\Events\Logout('web', $user));
+        }
+
+        // Properly log out from web guard
+        Auth::guard('web')->logout();
+
+        // Invalidate session
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        // Clear Sanctum cookies
+        return response()
+            ->json(['message' => 'Logout successful'])
+            ->withCookie(cookie()->forget('laravel_session'))
+            ->withCookie(cookie()->forget('XSRF-TOKEN'));
     }
-
-    // Properly log out from web guard
-    Auth::guard('web')->logout();
-
-    // Invalidate session
-    $request->session()->invalidate();
-    $request->session()->regenerateToken();
-
-    // Clear Sanctum cookies
-    return response()
-        ->json(['message' => 'Logout successful'])
-        ->withCookie(cookie()->forget('laravel_session'))
-        ->withCookie(cookie()->forget('XSRF-TOKEN'));
-}
-
-
-
 
     public function user(Request $request)
     {
         if (!$request->user()) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
-
         return response()->json($request->user());
     }
-
 
     public function profile(Request $request)
     {

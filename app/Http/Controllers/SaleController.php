@@ -24,14 +24,6 @@ class SaleController extends Controller
     }
 
     /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        // Not applicable for an API
-    }
-
-    /**
      * Store a newly created resource in storage.
      */
     public function store(Request $request)
@@ -127,14 +119,6 @@ class SaleController extends Controller
     }
 
     /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        // Not applicable for an API
-    }
-
-    /**
      * Update the specified resource in storage.
      */
     public function update(Request $request, string $id)
@@ -148,17 +132,5 @@ class SaleController extends Controller
         }
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        $sale = \App\Models\Sale::find($id);
-        if ($sale) {
-            $sale->delete();
-            return response()->json(['message' => 'Sale deleted']);
-        } else {
-            return response()->json(['message' => 'Sale not found'], 404);
-        }
-    }
+    
 }

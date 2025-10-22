@@ -8,18 +8,13 @@ use Illuminate\Support\Facades\Log;
 
 class TimeLogController extends Controller
 {
-     public function index(Request $request)
+    public function index(Request $request)
     {
-        $query = TimeLog::with('user')->orderBy('start_time', 'desc');
+        $query = TimeLog::with('user');
 
         // Filter by user
         if ($request->filled('user_id')) {
             $query->where('user_id', $request->user_id);
-        }
-
-        // Filter by status: ongoing/completed
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
         }
 
         // Filter by date
@@ -27,11 +22,17 @@ class TimeLogController extends Controller
             $query->whereDate('start_time', $request->date);
         }
 
-        // Latest first and paginate
-        $logs = $query->orderBy('start_time', 'desc')->paginate(20);
+        // Order: online first (end_time IS NULL), then offline, then by start_time desc
+        $query->orderByRaw('CASE WHEN end_time IS NULL THEN 0 ELSE 1 END')
+            ->orderBy('start_time', 'desc');
+
+        // Paginate
+        $logs = $query->paginate(20);
 
         return response()->json($logs);
     }
+
+
 
     public function store(Request $request)
     {
