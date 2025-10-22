@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 
 
+
 Route::get('/logs/inventory', [\App\Http\Controllers\InventoryLogController::class, 'index']);
 
 
@@ -11,6 +12,13 @@ Route::get('/logs/inventory', [\App\Http\Controllers\InventoryLogController::cla
 // use App\Http\Controllers\AuthController;
 Route::post('/api/login', [AuthController::class, 'login']);
 Route::post('/api/logout', [AuthController::class, 'logout'])->middleware('auth');
+
+Route::get('/totalSales', [\App\Http\Controllers\DashboardController::class, 'totalSales']);
+Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'getDashboard']);
+
+Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
+Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
+
 
 // // If you prefer to put auth routes in web.php
 // Route::prefix('api')->group(function () {

@@ -12,7 +12,8 @@ use App\Http\Controllers\TimeLogController;
 use App\Http\Controllers\SalesLogController;
 // Ensure InventoryLogController exists and is imported
 use App\Http\Controllers\InventoryLogController;
-
+use SebastianBergmann\CodeCoverage\Report\Html\Dashboard;
+use App\Http\Controllers\DashboardController;
 
 /*
 |--------------------------------------------------------------------------
@@ -34,9 +35,13 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get('/user', function (Request $request) {
         return $request->user();
     });
-    Route::get('/dashboard', [UserController::class, 'index']);
+    // Route::get('/dashboard', [UserController::class, 'index']);
+    Route::get('/dashboard', [DashboardController::class, 'getDashboard']);
 
     Route::get('/users', [UserController::class, 'index']);
+    Route::post('/users', [UserController::class, 'store']);
+    Route::put('/users/{user}', [UserController::class, 'update']);
+
 
     Route::get('/products', [ProductController::class, 'index']);
     Route::post('/products', [ProductController::class, 'store']);
