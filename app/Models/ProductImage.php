@@ -24,4 +24,9 @@ class ProductImage extends Model
         if (str_starts_with($value, 'http')) return $value;
         return asset('storage/' . $value);
     }
+
+    public function primaryImage()
+    {
+        return $this->hasOne(ProductImage::class)->where('is_primary', true);
+    }
 }

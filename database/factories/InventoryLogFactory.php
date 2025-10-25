@@ -18,7 +18,8 @@ class InventoryLogFactory extends Factory
      */
     public function definition(): array
     {
-        $actions = ['created', 'updated', 'deleted'];
+        $actions = ['created', 'modified', 'deleted', 'restock'];
+        
         $action = $this->faker->randomElement($actions);
 
         return [

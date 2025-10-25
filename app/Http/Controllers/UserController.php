@@ -7,70 +7,61 @@ use Illuminate\Http\Request;
 
 class UserController extends Controller
 {
+    public function user(Request $request)
+    {
+        return $request->user();
+    }
 
-    /**
-     * Display a listing of the resource.
-     */
-    // app/Http/Controllers/UserController.php
-public function index()
-{
-    $users = User::with([
-        'sales.saleItems' => fn($query) => $query->orderBy('created_at', 'desc'),
-        'timeLogs' => fn($query) => $query->orderBy('start_time', 'desc')
-    ])->get();
+    public function index()
+    {
+        $users = User::with([
+            'sales.saleItems' => fn($query) => $query->orderBy('created_at', 'desc'),
+            'timeLogs' => fn($query) => $query->orderBy('start_time', 'desc')
+        ])->get();
 
-    $formattedUsers = $users->map(function ($user) {
-        // Map all time logs
-        $timeLogs = $user->timeLogs->map(function ($log) {
+        $formattedUsers = $users->map(function ($user) {
+            // Map all time logs
+            $timeLogs = $user->timeLogs->map(function ($log) {
+                return [
+                    'id' => $log->id,
+                    'start_time' => $log->start_time,
+                    'end_time' => $log->end_time,
+                    'status' => $log->status,
+                    'current_status' => $log->status === 'logged_in' ? 'Active' : 'Inactive',
+                ];
+            });
+
             return [
-                'id' => $log->id,
-                'start_time' => $log->start_time,
-                'end_time' => $log->end_time,
-                'status' => $log->status,
-                'current_status' => $log->status === 'logged_in' ? 'Active' : 'Inactive',
+                'id' => $user->id,
+                'first_name' => $user->first_name,
+                'last_name' => $user->last_name,
+                'name' => trim($user->first_name . ' ' . $user->last_name),
+                'email' => $user->email,
+                'phone_number' => $user->phone_number ?? null,
+
+                // Full time logs
+                'time_logs' => $timeLogs,
+
+                // Latest time log for quick access
+                'latest_time_log' => $timeLogs->first() ?? [
+                    'current_status' => 'Inactive'
+                ],
+
+                // 💰 Sales logs
+                'sales_logs' => $user->sales->sortByDesc('created_at')->values()->map(function ($sale) {
+                    return [
+                        'date' => $sale->created_at->format('F d, Y'),
+                        'time' => $sale->created_at->format('h:i A'),
+                        'items' => $sale->saleItems->sum('quantity'),
+                        'total' => $sale->total_amount,
+                    ];
+                }),
             ];
         });
 
-        return [
-            'id' => $user->id,
-            'first_name' => $user->first_name,
-            'last_name' => $user->last_name,
-            'name' => trim($user->first_name . ' ' . $user->last_name),
-            'email' => $user->email,
-            'phone_number' => $user->phone_number ?? null,
+        return response()->json($formattedUsers);
+    }
 
-            // Full time logs
-            'time_logs' => $timeLogs,
-
-            // Latest time log for quick access
-            'latest_time_log' => $timeLogs->first() ?? [
-                'current_status' => 'Inactive'
-            ],
-
-            // 💰 Sales logs
-            'sales_logs' => $user->sales->sortByDesc('created_at')->values()->map(function ($sale) {
-                return [
-                    'date' => $sale->created_at->format('F d, Y'),
-                    'time' => $sale->created_at->format('h:i A'),
-                    'items' => $sale->saleItems->sum('quantity'),
-                    'total' => $sale->total_amount,
-                ];
-            }),
-        ];
-    });
-
-    return response()->json($formattedUsers);
-}
-
-
-
-
-
-
-    /**
-     * Store a newly created resource in storage.
-     */
-    // app/Http/Controllers/UserController.php
     public function store(Request $request)
     {
         $validated = $request->validate([
@@ -90,10 +81,6 @@ public function index()
         return response()->json($user, 201);
     }
 
-
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, User $user)
     {
         $validated = $request->validate([
@@ -116,25 +103,10 @@ public function index()
         return response()->json($user);
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        $user = \App\Models\User::find($id);
-        $user->delete();
-        return response()->json(['message' => 'User deleted']);
-    }
-
-
-
-    public function testPolicy(string $id)
-    {
-        $userToTest = User::find($id);
-        if ($userToTest->can('viewAny', User::class)) {
-            return response()->json(['message' => 'User can view any users.']);
-        } else {
-            return response()->json(['message' => 'User cannot view any users.'], 403);
-        }
-    }
+    // public function destroy(string $id)
+    // {
+    //     $user = \App\Models\User::find($id);
+    //     $user->delete();
+    //     return response()->json(['message' => 'User deleted']);
+    // }
 }

@@ -2,22 +2,23 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\CategoryController;
 
-
-
-Route::get('/logs/inventory', [\App\Http\Controllers\InventoryLogController::class, 'index']);
-
-
-
-// use App\Http\Controllers\AuthController;
+// login and logout must not change - something to do with backend session openning and closing
 Route::post('/api/login', [AuthController::class, 'login']);
 Route::post('/api/logout', [AuthController::class, 'logout'])->middleware('auth');
+    Route::get('/categories', [CategoryController::class, 'index']);
 
-Route::get('/totalSales', [\App\Http\Controllers\DashboardController::class, 'totalSales']);
-Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'getDashboard']);
 
-Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
-Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
+// data test
+// Route::get('/totalSales', [\App\Http\Controllers\DashboardController::class, 'totalSales']);
+// Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'getDashboard']);
+
+// Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
+// Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
+
+// Route::get('/logs/inventory', [\App\Http\Controllers\InventoryLogController::class, 'index']);
+
 
 
 // // If you prefer to put auth routes in web.php

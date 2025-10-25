@@ -171,9 +171,7 @@ class DashboardController extends Controller
         })->values(); // reset keys
     }
 
-
     // ------------------- Consolidated Dashboard Endpoint -------------------
-
     public function getDashboard()
     {
         return response()->json([

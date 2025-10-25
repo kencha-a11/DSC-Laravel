@@ -6,24 +6,17 @@ use Illuminate\Http\Request;
 use App\Models\Product;
 use Illuminate\Support\Facades\Storage;
 use App\Models\ProductImage;
+use Illuminate\Support\Facades\DB;
 
 class ProductController extends Controller
 {
-    /**
-     * Display a listing of products with categories.
-     */
     public function index()
     {
-        // Load all products with their many-to-many categories
-        $products = Product::with('categories')->get();
+        $products = Product::with(['categories', 'images_path'])->get();
 
-        // Transform the data to hide old 'category' field and ensure 'categories' array
         $products = $products->map(function ($product) {
             $stock = $product->stock_quantity ?? 0;
             $threshold = $product->low_stock_threshold ?? 10;
-
-            // Remove old single category field if it exists
-            unset($product->category);
 
             return [
                 'id' => $product->id,
@@ -31,8 +24,8 @@ class ProductController extends Controller
                 'price' => $product->price,
                 'stock_quantity' => $product->stock_quantity,
                 'low_stock_threshold' => $product->low_stock_threshold,
-                'image' => $product->image ?? null,
-                'categories' => $product->categories, // Many-to-many relationship
+                'image' => $product->images_path->first()?->image_path ?? null, // primary image
+                'categories' => $product->categories,
                 'status' => $stock === 0
                     ? 'out of stock'
                     : ($stock <= $threshold ? 'low stock' : 'stock'),
@@ -44,24 +37,19 @@ class ProductController extends Controller
         return response()->json($products);
     }
 
-    /**
-     * Store a newly created product with categories.
-     */
     public function store(Request $request)
     {
-        try {
-            // ✅ Validate incoming data
-            $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'price' => 'required|numeric|min:0',
-                'stock_quantity' => 'required|integer|min:0',
-                'low_stock_threshold' => 'nullable|integer|min:0',
-                'category_ids' => 'array',
-                'category_ids.*' => 'exists:categories,id',
-                'image_path' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
-            ]);
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'stock_quantity' => 'required|integer|min:0',
+            'low_stock_threshold' => 'nullable|integer|min:0',
+            'category_ids' => 'array',
+            'category_ids.*' => 'exists:categories,id',
+            'image_path' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
+        ]);
 
-            // ✅ Create the product
+        DB::transaction(function () use ($request, $validated, &$product) {
             $product = Product::create([
                 'name' => $validated['name'],
                 'price' => $validated['price'],
@@ -70,55 +58,43 @@ class ProductController extends Controller
                 'status' => 'stock',
             ]);
 
-            // ✅ Sync categories (many-to-many)
+            // Sync categories
             if (!empty($validated['category_ids'])) {
                 $product->categories()->sync($validated['category_ids']);
             }
 
-            // ✅ Handle image upload (if provided)
+            // Handle image upload
             if ($request->hasFile('image_path')) {
-                $path = $request->file('image_path')->store('images/products', 'public');
+                $file = $request->file('image_path');
+                $filename = uniqid() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs('images/products', $filename, 'public');
 
-                // If your Product hasOne/hasMany relation named `images_path`
                 $product->images_path()->create([
                     'image_path' => $path,
                     'is_primary' => true,
                 ]);
             }
+        });
 
-            // ✅ Return formatted response
-            return response()->json([
-                'message' => 'Product created successfully!',
-                'product' => $product->load('categories', 'images_path'),
-            ], 201);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Server error while saving product.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'message' => 'Product created successfully!',
+            'product' => $product->load('categories', 'images_path'),
+        ], 201);
     }
 
-     public function update(Request $request, Product $product)
+    public function update(Request $request, Product $product)
     {
-        try {
-            // ✅ Validate incoming data
-            $validated = $request->validate([
-                'name' => 'required|string|max:255',
-                'price' => 'required|numeric|min:0',
-                'stock_quantity' => 'required|integer|min:0',
-                'low_stock_threshold' => 'nullable|integer|min:0',
-                'category_ids' => 'array',
-                'category_ids.*' => 'exists:categories,id',
-                'image_path' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
-            ]);
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'price' => 'required|numeric|min:0',
+            'stock_quantity' => 'required|integer|min:0',
+            'low_stock_threshold' => 'nullable|integer|min:0',
+            'category_ids' => 'array',
+            'category_ids.*' => 'exists:categories,id',
+            'image_path' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
+        ]);
 
-            // ✅ Update product fields
+        DB::transaction(function () use ($request, $validated, $product) {
             $product->update([
                 'name' => $validated['name'],
                 'price' => $validated['price'],
@@ -126,72 +102,80 @@ class ProductController extends Controller
                 'low_stock_threshold' => $validated['low_stock_threshold'] ?? 10,
             ]);
 
-            // ✅ Sync categories (many-to-many)
-            if (!empty($validated['category_ids'])) {
-                $product->categories()->sync($validated['category_ids']);
-            } else {
-                $product->categories()->sync([]);
-            }
+            // Sync categories
+            $product->categories()->sync($validated['category_ids'] ?? []);
 
-            // ✅ Handle image upload (replace old if exists)
+            // Handle image upload (replace old primary image)
             if ($request->hasFile('image_path')) {
-                // Delete old image if exists
-                if ($product->images_path()->exists()) {
-                    $product->images_path()->each(function($img){
-                        Storage::disk('public')->delete($img->image_path);
-                        $img->delete();
-                    });
-                }
+                // Delete old images
+                $product->images_path->each(function ($img) {
+                    Storage::disk('public')->delete($img->image_path);
+                });
+                $product->images_path()->delete();
 
-                $path = $request->file('image_path')->store('images/products', 'public');
+                $file = $request->file('image_path');
+                $filename = uniqid() . '_' . $file->getClientOriginalName();
+                $path = $file->storeAs('images/products', $filename, 'public');
+
                 $product->images_path()->create([
                     'image_path' => $path,
                     'is_primary' => true,
                 ]);
             }
+        });
 
-            return response()->json([
-                'message' => 'Product updated successfully!',
-                'product' => $product->load('categories', 'images_path'),
-            ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'message' => 'Validation failed.',
-                'errors' => $e->errors(),
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Server error while updating product.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
+        return response()->json([
+            'message' => 'Product updated successfully!',
+            'product' => $product->load('categories', 'images_path'),
+        ]);
     }
 
-    /**
-     * Delete a product.
-     */
     public function destroy(Product $product)
     {
-        try {
-            // Delete related images
-            if ($product->images_path()->exists()) {
-                $product->images_path()->each(function ($img) {
-                    Storage::disk('public')->delete($img->image_path);
-                    $img->delete();
-                });
+        DB::transaction(function () use ($product) {
+            $product->images_path->each(
+                fn($img) =>
+                Storage::disk('public')->delete($img->image_path)
+            );
+            $product->images_path()->delete();
+            $product->delete();
+        });
+
+        return response()->json(['message' => 'Product deleted successfully!']);
+    }
+
+    public function destroyMultiple(Request $request)
+    {
+        $productIds = $request->input('products', []);
+
+        if (empty($productIds)) {
+            return response()->json([
+                'message' => 'No products selected for deletion.'
+            ], 400);
+        }
+
+        // Fetch products with relationships for proper cleanup
+        $products = Product::with(['categories', 'images_path'])->whereIn('id', $productIds)->get();
+
+        foreach ($products as $product) {
+            // Detach all category relationships
+            $product->categories()->detach();
+
+            // Optionally delete associated images if they exist
+            foreach ($product->images_path as $image) {
+                if (file_exists(public_path($image->path))) {
+                    @unlink(public_path($image->path));
+                }
+                $image->delete();
             }
 
-            // Delete product itself
+            // Delete the product itself
             $product->delete();
-
-            return response()->json([
-                'message' => 'Product deleted successfully!',
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Server error while deleting product.',
-                'error' => $e->getMessage(),
-            ], 500);
         }
+
+        return response()->json([
+            'message' => 'Selected products deleted successfully.',
+            'deleted_count' => count($productIds),
+        ]);
     }
 }

@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
-            $table->enum('action', ['created', 'updated', 'deleted'])->default('updated');
+            $table->enum('action', ['created', 'modified', 'deleted', 'restock'])->default('updated');
             $table->integer('quantity_change')->nullable();
             $table->timestamps();
 

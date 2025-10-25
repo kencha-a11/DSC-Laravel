@@ -32,11 +32,13 @@ class DatabaseSeeder extends Seeder
         // 3️⃣ Seed Products
         $products = Product::factory()->count(20)->create();
 
-        // 4️⃣ Attach random categories to products (many-to-many)
+        // 4️⃣ Attach at least 1 random category to each product
         foreach ($products as $product) {
-            $product->categories()->attach(
-                $categories->random(rand(1, 3))->pluck('id')->toArray()
-            );
+            // Pick 1 to 3 random categories
+            $randomCategories = $categories->random(rand(1, 3))->pluck('id')->toArray();
+
+            // Attach to product
+            $product->categories()->attach($randomCategories);
         }
 
         // 5️⃣ Seed Logs

@@ -32,8 +32,6 @@ class TimeLogController extends Controller
         return response()->json($logs);
     }
 
-
-
     public function store(Request $request)
     {
         $data = $request->validate([

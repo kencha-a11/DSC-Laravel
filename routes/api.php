@@ -2,17 +2,13 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\SaleController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProductController;
-
 use App\Http\Controllers\TimeLogController;
 use App\Http\Controllers\SalesLogController;
-// Ensure InventoryLogController exists and is imported
 use App\Http\Controllers\InventoryLogController;
-use SebastianBergmann\CodeCoverage\Report\Html\Dashboard;
 use App\Http\Controllers\DashboardController;
 
 /*
@@ -24,7 +20,7 @@ use App\Http\Controllers\DashboardController;
 */
 
 
-// These routes need web middleware for CSRF
+// These routes need web middleware for CSRF 
 // Route::middleware(['web'])->group(function () {
 //     Route::post('/login', [AuthController::class, 'login']);
 //     Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
@@ -32,26 +28,31 @@ use App\Http\Controllers\DashboardController;
 
 // Protected routes
 Route::middleware(['auth:sanctum'])->group(function () {
-    Route::get('/user', function (Request $request) {
-        return $request->user();
-    });
-    // Route::get('/dashboard', [UserController::class, 'index']);
+    Route::get('/user', [UserController::class, 'user']);
+
     Route::get('/dashboard', [DashboardController::class, 'getDashboard']);
 
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users', [UserController::class, 'store']);
     Route::put('/users/{user}', [UserController::class, 'update']);
+    // no delete just deactivated account
 
 
     Route::get('/products', [ProductController::class, 'index']);
     Route::post('/products', [ProductController::class, 'store']);
     Route::put('/products/{product}', [ProductController::class, 'update']);
+    Route::delete('/products/multiple', [ProductController::class, 'destroyMultiple']);
     Route::delete('/products/{product}', [ProductController::class, 'destroy']);
+    // make sure the image fully delete in public and storage
 
     Route::post('/sales/store', [SaleController::class, 'store']);
+    // revert changes for limited time 10 seconds - if agreed rollback data - in case customer backout
 
-    Route::get('/categories', [CategoryController::class, 'index']); // ADD THIS LINE
+    Route::get('/categories', [CategoryController::class, 'index']);
     Route::post('/categories', [CategoryController::class, 'store']);
+    Route::delete('/categories/multiple', [CategoryController::class, 'destroyMultiple']);
+    // updating category of single of multiple category
+    // missing route deleting single or multiple category
 });
 
 Route::middleware('auth:sanctum')->prefix('logs')->group(function () {
@@ -63,14 +64,16 @@ Route::middleware('auth:sanctum')->prefix('logs')->group(function () {
 
 });
 
-// Example of grouping protected routes
-Route::middleware('auth:sanctum')->group(function () {
-    // Fetch authenticated user
-    Route::get('/profile', [AuthController::class, 'profile']);
 
-    // Example of resource routes
-    // Route::apiResource('posts', \App\Http\Controllers\PostController::class);
-});
+
+// // Example of grouping protected routes
+// Route::middleware('auth:sanctum')->group(function () {
+//     // Fetch authenticated user
+//     Route::get('/profile', [AuthController::class, 'profile']);
+
+//     // Example of resource routes
+//     // Route::apiResource('posts', \App\Http\Controllers\PostController::class);
+// });
 
 
 // Route::get('/test', function () {

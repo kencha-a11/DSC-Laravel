@@ -14,18 +14,12 @@ use Illuminate\Support\Facades\Log;
 class SaleController extends Controller
 {
 
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
         $sales = \App\Models\Sale::all();
         return response()->json($sales);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
     public function store(Request $request)
     {
         Log::info('Sale request received', ['request' => $request->all()]);
@@ -105,32 +99,24 @@ class SaleController extends Controller
     }
 
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        $sale = \App\Models\Sale::find($id);
-        if ($sale) {
-            return response()->json($sale);
-        } else {
-            return response()->json(['message' => 'Sale not found'], 404);
-        }
-    }
+    // public function show(string $id)
+    // {
+    //     $sale = \App\Models\Sale::find($id);
+    //     if ($sale) {
+    //         return response()->json($sale);
+    //     } else {
+    //         return response()->json(['message' => 'Sale not found'], 404);
+    //     }
+    // }
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        $sale = \App\Models\Sale::find($id);
-        if ($sale) {
-            $sale->update($request->all());
-            return response()->json($sale);
-        } else {
-            return response()->json(['message' => 'Sale not found'], 404);
-        }
-    }
-
-    
+    // public function update(Request $request, string $id)
+    // {
+    //     $sale = \App\Models\Sale::find($id);
+    //     if ($sale) {
+    //         $sale->update($request->all());
+    //         return response()->json($sale);
+    //     } else {
+    //         return response()->json(['message' => 'Sale not found'], 404);
+    //     }
+    // }
 }
