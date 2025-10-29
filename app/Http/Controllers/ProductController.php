@@ -7,34 +7,74 @@ use App\Models\Product;
 use Illuminate\Support\Facades\Storage;
 use App\Models\ProductImage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class ProductController extends Controller
 {
-    public function index()
+    /**
+     * Display a listing of the products.
+     * Supports pagination, search, and category filtering.
+     */
+    public function index(Request $request)
     {
-        $products = Product::with(['categories', 'images_path'])->get();
+        $perPage  = (int) $request->query('perPage', 10);
+        $search   = trim($request->query('search', ''));
+        $category = $request->query('category', null);
 
-        $products = $products->map(function ($product) {
-            $stock = $product->stock_quantity ?? 0;
-            $threshold = $product->low_stock_threshold ?? 10;
+        $query = Product::with('categories');
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->whereRaw('LOWER(name) LIKE ?', ['%' . strtolower($search) . '%'])
+                    ->orWhereHas('categories', function ($qc) use ($search) {
+                        $qc->whereRaw('LOWER(category_name) LIKE ?', ['%' . strtolower($search) . '%']);
+                    });
+            });
+        }
+
+        if ($category && strtolower($category) !== 'all') {
+            if (is_numeric($category)) {
+                $query->whereHas('categories', fn($q) => $q->where('id', $category));
+            } else {
+                $query->whereHas(
+                    'categories',
+                    fn($q) => $q->whereRaw('LOWER(category_name) = ?', [strtolower($category)])
+                );
+            }
+        }
+
+        $products = $query->orderBy('created_at', 'desc')->paginate($perPage);
+
+        $products->getCollection()->transform(function ($product) {
+            $categories = $product->categories->map(fn($c) => [
+                'id' => $c->id,
+                'name' => $c->category_name,
+            ])->toArray();
 
             return [
                 'id' => $product->id,
                 'name' => $product->name,
+                'categories' => $categories,
                 'price' => $product->price,
                 'stock_quantity' => $product->stock_quantity,
                 'low_stock_threshold' => $product->low_stock_threshold,
-                'image' => $product->images_path->first()?->image_path ?? null, // primary image
-                'categories' => $product->categories,
-                'status' => $stock === 0
-                    ? 'out of stock'
-                    : ($stock <= $threshold ? 'low stock' : 'stock'),
+                'status' => $product->status,
+                'image' => $product->image_path
+                    ? asset('images/products/' . $product->image_path)
+                    : 'https://via.placeholder.com/64?text=' . urlencode(substr($product->name ?? 'P', 0, 1)),
                 'created_at' => $product->created_at,
                 'updated_at' => $product->updated_at,
             ];
         });
 
-        return response()->json($products);
+        return response()->json([
+            'data' => $products->items(),
+            'current_page' => $products->currentPage(),
+            'last_page' => $products->lastPage(),
+            'per_page' => $products->perPage(),
+            'total' => $products->total(),
+            'hasMore' => $products->hasMorePages(),
+        ]);
     }
 
     public function store(Request $request)
@@ -44,12 +84,13 @@ class ProductController extends Controller
             'price' => 'required|numeric|min:0',
             'stock_quantity' => 'required|integer|min:0',
             'low_stock_threshold' => 'nullable|integer|min:0',
-            'category_ids' => 'array',
+            'category_ids' => 'nullable|array',
             'category_ids.*' => 'exists:categories,id',
             'image_path' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
         ]);
 
-        DB::transaction(function () use ($request, $validated, &$product) {
+        $product = DB::transaction(function () use ($request, $validated) {
+            // Create new product
             $product = Product::create([
                 'name' => $validated['name'],
                 'price' => $validated['price'],
@@ -68,17 +109,15 @@ class ProductController extends Controller
                 $file = $request->file('image_path');
                 $filename = uniqid() . '_' . $file->getClientOriginalName();
                 $path = $file->storeAs('images/products', $filename, 'public');
-
-                $product->images_path()->create([
-                    'image_path' => $path,
-                    'is_primary' => true,
-                ]);
+                $product->update(['image_path' => $path]);
             }
+
+            return $product;
         });
 
         return response()->json([
             'message' => 'Product created successfully!',
-            'product' => $product->load('categories', 'images_path'),
+            'product' => $product->load('categories'),
         ], 201);
     }
 
@@ -105,43 +144,46 @@ class ProductController extends Controller
             // Sync categories
             $product->categories()->sync($validated['category_ids'] ?? []);
 
-            // Handle image upload (replace old primary image)
+            // Handle image upload safely
             if ($request->hasFile('image_path')) {
-                // Delete old images
-                $product->images_path->each(function ($img) {
-                    Storage::disk('public')->delete($img->image_path);
-                });
-                $product->images_path()->delete();
+                // Delete old image if exists
+                if ($product->image_path && Storage::disk('public')->exists($product->image_path)) {
+                    Storage::disk('public')->delete($product->image_path);
+                }
 
+                // Upload new image
                 $file = $request->file('image_path');
                 $filename = uniqid() . '_' . $file->getClientOriginalName();
                 $path = $file->storeAs('images/products', $filename, 'public');
 
-                $product->images_path()->create([
-                    'image_path' => $path,
-                    'is_primary' => true,
-                ]);
+                $product->update(['image_path' => $path]);
             }
         });
 
         return response()->json([
             'message' => 'Product updated successfully!',
-            'product' => $product->load('categories', 'images_path'),
+            'product' => $product->load('categories'),
         ]);
     }
 
     public function destroy(Product $product)
     {
         DB::transaction(function () use ($product) {
-            $product->images_path->each(
-                fn($img) =>
-                Storage::disk('public')->delete($img->image_path)
-            );
-            $product->images_path()->delete();
+            // Delete image if exists
+            if ($product->image_path && Storage::disk('public')->exists($product->image_path)) {
+                Storage::disk('public')->delete($product->image_path);
+            }
+
+            // Detach categories
+            $product->categories()->detach();
+
+            // Permanently delete the product
             $product->delete();
         });
 
-        return response()->json(['message' => 'Product deleted successfully!']);
+        return response()->json([
+            'message' => 'Product deleted successfully!'
+        ]);
     }
 
     public function destroyMultiple(Request $request)
@@ -154,24 +196,22 @@ class ProductController extends Controller
             ], 400);
         }
 
-        // Fetch products with relationships for proper cleanup
-        $products = Product::with(['categories', 'images_path'])->whereIn('id', $productIds)->get();
+        DB::transaction(function () use ($productIds) {
+            $products = Product::whereIn('id', $productIds)->get();
 
-        foreach ($products as $product) {
-            // Detach all category relationships
-            $product->categories()->detach();
-
-            // Optionally delete associated images if they exist
-            foreach ($product->images_path as $image) {
-                if (file_exists(public_path($image->path))) {
-                    @unlink(public_path($image->path));
+            foreach ($products as $product) {
+                // Delete image if exists
+                if ($product->image_path && Storage::disk('public')->exists($product->image_path)) {
+                    Storage::disk('public')->delete($product->image_path);
                 }
-                $image->delete();
-            }
 
-            // Delete the product itself
-            $product->delete();
-        }
+                // Detach categories
+                $product->categories()->detach();
+
+                // Permanently delete
+                $product->delete();
+            }
+        });
 
         return response()->json([
             'message' => 'Selected products deleted successfully.',

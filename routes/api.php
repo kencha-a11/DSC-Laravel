@@ -52,7 +52,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/categories', [CategoryController::class, 'store']);
     Route::delete('/categories/multiple', [CategoryController::class, 'destroyMultiple']);
     // updating category of single of multiple category
-    // missing route deleting single or multiple category
 });
 
 Route::middleware('auth:sanctum')->prefix('logs')->group(function () {

@@ -7,7 +7,8 @@ use App\Http\Controllers\CategoryController;
 // login and logout must not change - something to do with backend session openning and closing
 Route::post('/api/login', [AuthController::class, 'login']);
 Route::post('/api/logout', [AuthController::class, 'logout'])->middleware('auth');
-    Route::get('/categories', [CategoryController::class, 'index']);
+
+Route::get('/categories', [CategoryController::class, 'index']);
 
 
 // data test
@@ -15,9 +16,10 @@ Route::post('/api/logout', [AuthController::class, 'logout'])->middleware('auth'
 // Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'getDashboard']);
 
 // Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
-// Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
+Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
 
-// Route::get('/logs/inventory', [\App\Http\Controllers\InventoryLogController::class, 'index']);
+Route::get('/logs/inventory', [\App\Http\Controllers\InventoryLogController::class, 'index']);
+Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
 
 
 

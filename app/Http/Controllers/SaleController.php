@@ -22,9 +22,6 @@ class SaleController extends Controller
 
     public function store(Request $request)
     {
-        Log::info('Sale request received', ['request' => $request->all()]);
-
-        // Validate the incoming request
         $validated = $request->validate([
             'items' => 'required|array|min:1',
             'items.*.product_id' => 'required|integer|exists:products,id',
@@ -32,71 +29,41 @@ class SaleController extends Controller
             'total_amount' => 'required|numeric|min:0',
         ]);
 
-        Log::info('Validated data', ['validated' => $validated]);
-
         return DB::transaction(function () use ($validated) {
-
-            // Create the Sale once
             $sale = Sale::create([
                 'user_id' => auth()->id(),
                 'total_amount' => $validated['total_amount'],
             ]);
 
-            Log::info('Sale created', ['sale' => $sale->toArray()]);
-
-            // Loop over items and create SaleItems
             foreach ($validated['items'] as $item) {
                 $product = Product::where('id', $item['product_id'])
-                    ->lockForUpdate() // prevent race conditions
+                    ->lockForUpdate()
                     ->firstOrFail();
 
-                Log::info('Processing product', [
-                    'product_id' => $product->id,
-                    'stock_before' => $product->stock_quantity,
-                    'requested_quantity' => $item['quantity']
-                ]);
-
-                // Check stock
                 if ($product->stock_quantity < $item['quantity']) {
-                    Log::warning('Not enough stock', [
-                        'product_id' => $product->id,
-                        'available_stock' => $product->stock_quantity,
-                        'requested_quantity' => $item['quantity']
-                    ]);
-
-                    return response()->json([
-                        'message' => "Not enough stock for product: {$product->name}"
-                    ], 422);
+                    throw new \Exception("Not enough stock for product: {$product->name}");
                 }
 
-                // Decrement stock
                 $product->decrement('stock_quantity', $item['quantity']);
-                Log::info('Stock decremented', [
-                    'product_id' => $product->id,
-                    'stock_after' => $product->stock_quantity
-                ]);
 
-                // Calculate subtotal
-                $price = $product->price;
-                $subtotal = $price * $item['quantity'];
-
-                // Create SaleItem linked to the Sale
-                $saleItem = $sale->saleItems()->create([
+                $sale->saleItems()->create([
                     'product_id' => $product->id,
                     'quantity' => $item['quantity'],
-                    'price' => $price,
-                    'subtotal' => $subtotal,
+                    'price' => $product->price,
+                    'subtotal' => $product->price * $item['quantity'],
+                    'snapshot_name' => $item['snapshot_name'] ?? $product->name,
+                    'snapshot_quantity' => $item['quantity'],
+                    'snapshot_price' => $item['snapshot_price'] ?? $product->price,
                 ]);
-
-                Log::info('SaleItem created', ['sale_item' => $saleItem->toArray()]);
             }
 
-            Log::info('Sale completed', ['sale' => $sale->load('saleItems.product')->toArray()]);
-
-            // Return sale with items and products
-            return response()->json($sale->load('saleItems.product'), 201);
+            return response()->json([
+                'message' => 'Sale created successfully',
+                'sale_id' => $sale->id,
+            ], 201);
         });
     }
+
 
 
     // public function show(string $id)

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -15,12 +16,16 @@ class UserController extends Controller
     public function index()
     {
         $users = User::with([
-            'sales.saleItems' => fn($query) => $query->orderBy('created_at', 'desc'),
+            // Sort sales newest first
+            'sales' => fn($query) => $query->orderBy('created_at', 'desc'),
+            // Eager load saleItems
+            'sales.saleItems',
+            // Time logs newest first
             'timeLogs' => fn($query) => $query->orderBy('start_time', 'desc')
         ])->get();
 
         $formattedUsers = $users->map(function ($user) {
-            // Map all time logs
+            // Format time logs
             $timeLogs = $user->timeLogs->map(function ($log) {
                 return [
                     'id' => $log->id,
@@ -31,6 +36,9 @@ class UserController extends Controller
                 ];
             });
 
+            // Latest time log
+            $latestLog = $timeLogs->first();
+
             return [
                 'id' => $user->id,
                 'first_name' => $user->first_name,
@@ -40,27 +48,33 @@ class UserController extends Controller
                 'phone_number' => $user->phone_number ?? null,
 
                 // Full time logs
-                'time_logs' => $timeLogs,
+                'time_logs' => $timeLogs->all(),
 
                 // Latest time log for quick access
-                'latest_time_log' => $timeLogs->first() ?? [
-                    'current_status' => 'Inactive'
-                ],
+                'latest_time_log' => $latestLog ?? ['current_status' => 'Inactive'],
 
-                // 💰 Sales logs
-                'sales_logs' => $user->sales->sortByDesc('created_at')->values()->map(function ($sale) {
+                // Sales logs
+                'sales_logs' => $user->sales->map(function ($sale) {
                     return [
                         'date' => $sale->created_at->format('F d, Y'),
                         'time' => $sale->created_at->format('h:i A'),
-                        'items' => $sale->saleItems->sum('quantity'),
-                        'total' => $sale->total_amount,
+                        'total' => (string) $sale->total_amount,
+                        'items' => $sale->saleItems->sum('snapshot_quantity'),
+
+                        // 💡 Key fix: snapshot_name now matches React expectation
+                        'sale_items' => $sale->saleItems->map(fn($item) => [
+                            'snapshot_name' => $item->snapshot_name,
+                            'snapshot_quantity' => $item->snapshot_quantity,
+                            'snapshot_price' => (string) $item->snapshot_price,
+                        ])->all(),
                     ];
-                }),
+                })->all(),
             ];
         });
 
         return response()->json($formattedUsers);
     }
+
 
     public function store(Request $request)
     {

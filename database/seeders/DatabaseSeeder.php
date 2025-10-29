@@ -15,33 +15,55 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1️⃣ Seed Users + Sales + SaleItems
-        $users = User::factory()
+        // 1️⃣ Seed Categories
+        $categories = Category::factory()->count(5)->create();
+
+        // 2️⃣ Seed Products and attach categories
+        $products = Product::factory()
+            ->count(20)
+            ->create()
+            ->each(function ($product) use ($categories) {
+                $product->categories()->attach(
+                    $categories->random(rand(1, 3))->pluck('id')->toArray()
+                );
+            });
+
+        // 3️⃣ Seed Users + Sales + SaleItems
+        User::factory()
             ->count(5)
             ->has(
                 \App\Models\Sale::factory()
                     ->count(3)
-                    ->has(\App\Models\SaleItem::factory()->count(4), 'saleItems'),
+                    ->has(
+                        \App\Models\SaleItem::factory()
+                            ->count(4)
+                            ->state(function () use ($products) {
+                                // Pick a random product
+                                $product = $products->random();
+                                $snapshotQuantity = fake()->numberBetween(1, 5);
+
+                                // Randomly simulate deleted product
+                                $productId = fake()->boolean(20) ? null : $product->id;
+
+                                return [
+                                    'product_id' => $productId,
+                                    'quantity' => $snapshotQuantity,
+                                    'price' => $product->price,
+                                    'subtotal' => $snapshotQuantity * $product->price,
+
+                                    // Always fill snapshot fields
+                                    'snapshot_name' => $product->name ?? 'Deleted Product',
+                                    'snapshot_quantity' => $snapshotQuantity,
+                                    'snapshot_price' => $product->price ?? 0,
+                                ];
+                            }),
+                        'saleItems'
+                    ),
                 'sales'
             )
             ->create();
 
-        // 2️⃣ Seed Categories
-        $categories = Category::factory()->count(5)->create();
-
-        // 3️⃣ Seed Products
-        $products = Product::factory()->count(20)->create();
-
-        // 4️⃣ Attach at least 1 random category to each product
-        foreach ($products as $product) {
-            // Pick 1 to 3 random categories
-            $randomCategories = $categories->random(rand(1, 3))->pluck('id')->toArray();
-
-            // Attach to product
-            $product->categories()->attach($randomCategories);
-        }
-
-        // 5️⃣ Seed Logs
+        // 4️⃣ Seed Logs
         $this->call([
             \Database\Seeders\TimeLogSeeder::class,
             \Database\Seeders\SalesLogSeeder::class,

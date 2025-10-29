@@ -17,13 +17,13 @@ class InventoryLog extends Model
         'quantity_change',
     ];
 
-    // Relationship to User
+    // all users have inventory logs
     public function user()
     {
         return $this->belongsTo(User::class);
     }
 
-    // Relationship to Product
+    // this inventory log consist of product
     public function product()
     {
         return $this->belongsTo(Product::class);

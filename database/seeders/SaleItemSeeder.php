@@ -12,6 +12,6 @@ class SaleItemSeeder extends Seeder
      */
     public function run(): void
     {
-        \App\Models\SaleItem::factory()->count(50)->create();
+        \App\Models\SaleItem::factory()->count(20)->create();
     }
 }
