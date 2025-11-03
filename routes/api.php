@@ -10,6 +10,7 @@ use App\Http\Controllers\TimeLogController;
 use App\Http\Controllers\SalesLogController;
 use App\Http\Controllers\InventoryLogController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProfileController;
 
 /*
 |--------------------------------------------------------------------------
@@ -28,39 +29,67 @@ use App\Http\Controllers\DashboardController;
 
 // Protected routes
 Route::middleware(['auth:sanctum'])->group(function () {
+
+    // ===========application===========
+
+    // this check if user is logged in
     Route::get('/user', [UserController::class, 'user']);
 
-    Route::get('/dashboard', [DashboardController::class, 'getDashboard']);
+    // there are two types of dashboard cashier and manager
+    Route::get('/dashboard/manager', [DashboardController::class, 'adminDashboardData']);
+    Route::get('/dashboard/cashier', [DashboardController::class, 'cashierDashboardData']);
+    Route::get('/dashboard/manager/non-selling', [DashboardController::class, 'nonSellingProducts']);
+    Route::get('/dashboard/manager/low-stock', [DashboardController::class, 'lowStockAlert']);
 
+
+
+    // ===========cashier===========
+
+    // cashier operation in sell module
+    Route::post('/sales/store', [SaleController::class, 'store']);
+    // revert changes for limited time 10 seconds - if agreed rollback data - in case customer backoutF
+
+    // ===========manager===========
+
+    // manager operation related to account module
     Route::get('/users', [UserController::class, 'index']);
     Route::post('/users', [UserController::class, 'store']);
     Route::put('/users/{user}', [UserController::class, 'update']);
     // no delete just deactivated account
 
+    // profile management
+    Route::get('/user/profile', [ProfileController::class, 'show']);
+    Route::put('/user/profile', [ProfileController::class, 'update']);
+    Route::put('/user/profile/password', [ProfileController::class, 'updatePassword']);
 
+
+
+
+    // manager operation related to product module
     Route::get('/products', [ProductController::class, 'index']);
     Route::post('/products', [ProductController::class, 'store']);
     Route::put('/products/{product}', [ProductController::class, 'update']);
-    Route::delete('/products/multiple', [ProductController::class, 'destroyMultiple']);
     Route::delete('/products/{product}', [ProductController::class, 'destroy']);
+    Route::delete('/products/multiple', [ProductController::class, 'destroyMultiple']);
+    Route::post('/products/{product}/restock', [ProductController::class, 'restock']);
+    Route::post('/products/{product}/deduct', [ProductController::class, 'deduct']);
     // make sure the image fully delete in public and storage
 
-    Route::post('/sales/store', [SaleController::class, 'store']);
-    // revert changes for limited time 10 seconds - if agreed rollback data - in case customer backout
-
+    // manager operation related to category module, show , store and delete
     Route::get('/categories', [CategoryController::class, 'index']);
     Route::post('/categories', [CategoryController::class, 'store']);
     Route::delete('/categories/multiple', [CategoryController::class, 'destroyMultiple']);
     // updating category of single of multiple category
+
 });
 
+// manager operation related to record component
 Route::middleware('auth:sanctum')->prefix('logs')->group(function () {
     Route::get('/time', [TimeLogController::class, 'index']);
     Route::post('/time', [TimeLogController::class, 'store']);
-    
+
     Route::get('/sales', [SalesLogController::class, 'index']);
     Route::get('/inventory', [InventoryLogController::class, 'index']);
-
 });
 
 

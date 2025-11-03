@@ -6,9 +6,7 @@ use Illuminate\Http\Request;
 
 class SaleItemController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
+
     public function index()
     {
         $saleItems = \App\Models\SaleItem::all();
@@ -32,30 +30,6 @@ class SaleItemController extends Controller
         return response()->json($saleItem, 201);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        $saleItem = \App\Models\SaleItem::find($id);
-        if ($saleItem) {
-            return response()->json($saleItem);
-        } else {
-            return response()->json(['message' => 'Sale Item not found'], 404);
-        }
-    }
-
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        // Not applicable for an API
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
     public function update(Request $request, string $id)
     {
         $saleItem = \App\Models\SaleItem::find($id);
@@ -67,9 +41,6 @@ class SaleItemController extends Controller
         }
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
     public function destroy(string $id)
     {
         $saleItem = \App\Models\SaleItem::find($id);

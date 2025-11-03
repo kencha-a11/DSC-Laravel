@@ -3,15 +3,13 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Models\SalesLog;
-use Illuminate\Support\Facades\Log;
 use App\Models\Sale;
 
 class SalesLogController extends Controller
 {
-     public function index(Request $request)
+    public function index(Request $request)
     {
-         $query = Sale::with(['user', 'saleItems.product']); // eager load items and products
+        $query = Sale::with(['user', 'saleItems.product']);
 
         if ($request->filled('user_id')) {
             $query->where('user_id', $request->user_id);

@@ -2,11 +2,11 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use App\Models\User;
 use App\Models\Product;
 use App\Models\Category;
+use App\Models\TimeLog;
 
 class DatabaseSeeder extends Seeder
 {
@@ -15,59 +15,76 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // 1️⃣ Seed Categories
-        $categories = Category::factory()->count(5)->create();
+        // 1️⃣ Categories
+        $categories = Category::factory(5)->create();
 
-        // 2️⃣ Seed Products and attach categories
-        $products = Product::factory()
-            ->count(20)
+        // 2️⃣ Products with random category attachments
+        $products = Product::factory(20)
             ->create()
-            ->each(function ($product) use ($categories) {
+            ->each(fn($product) => 
                 $product->categories()->attach(
                     $categories->random(rand(1, 3))->pluck('id')->toArray()
-                );
-            });
+                )
+            );
 
-        // 3️⃣ Seed Users + Sales + SaleItems
-        User::factory()
-            ->count(5)
+        // 3️⃣ Users with nested Sales → SaleItems (including deleted product simulation)
+        $users = User::factory(5)
             ->has(
-                \App\Models\Sale::factory()
-                    ->count(3)
+                \App\Models\Sale::factory(3)
                     ->has(
-                        \App\Models\SaleItem::factory()
-                            ->count(4)
-                            ->state(function () use ($products) {
-                                // Pick a random product
-                                $product = $products->random();
-                                $snapshotQuantity = fake()->numberBetween(1, 5);
+                        \App\Models\SaleItem::factory(4)->state(function () use ($products) {
+                            $product = $products->random();
+                            $snapshotQuantity = fake()->numberBetween(1, 5);
+                            $isDeleted = fake()->boolean(20); // 20% chance product deleted
 
-                                // Randomly simulate deleted product
-                                $productId = fake()->boolean(20) ? null : $product->id;
-
-                                return [
-                                    'product_id' => $productId,
-                                    'quantity' => $snapshotQuantity,
-                                    'price' => $product->price,
-                                    'subtotal' => $snapshotQuantity * $product->price,
-
-                                    // Always fill snapshot fields
-                                    'snapshot_name' => $product->name ?? 'Deleted Product',
-                                    'snapshot_quantity' => $snapshotQuantity,
-                                    'snapshot_price' => $product->price ?? 0,
-                                ];
-                            }),
+                            return [
+                                'product_id' => $isDeleted ? null : $product->id,
+                                'quantity' => $snapshotQuantity,
+                                'price' => $product->price,
+                                'subtotal' => $snapshotQuantity * $product->price,
+                                'snapshot_name' => $product->name ?? 'Deleted Product',
+                                'snapshot_quantity' => $snapshotQuantity,
+                                'snapshot_price' => $product->price ?? 0,
+                            ];
+                        }),
                         'saleItems'
                     ),
                 'sales'
             )
             ->create();
 
-        // 4️⃣ Seed Logs
+        // 4️⃣ Time, Sales, and Inventory Logs
         $this->call([
-            \Database\Seeders\TimeLogSeeder::class,
-            \Database\Seeders\SalesLogSeeder::class,
-            \Database\Seeders\InventoryLogSeeder::class,
+            TimeLogSeeder::class,
+            SalesLogSeeder::class,
+            InventoryLogSeeder::class,
         ]);
+
+        // 5️⃣ Enforce "one open TimeLog per user"
+        $this->fixOngoingTimeLogs($users);
+    }
+
+    /**
+     * Ensure each user has at most one open (unclosed) TimeLog.
+     */
+    protected function fixOngoingTimeLogs($users): void
+    {
+        $users->each(function ($user) {
+            $openLogs = TimeLog::where('user_id', $user->id)
+                ->whereNull('end_time')
+                ->orderByDesc('start_time')
+                ->get();
+
+            if ($openLogs->count() > 1) {
+                // Keep the latest open log, close the rest
+                $openLogs->skip(1)->each(function ($log) {
+                    $log->update([
+                        'end_time' => $log->start_time->copy()->addMinutes(rand(15, 480)),
+                        'status' => 'logged_out',
+                        'updated_at' => now(),
+                    ]);
+                });
+            }
+        });
     }
 }

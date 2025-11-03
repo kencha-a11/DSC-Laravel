@@ -15,7 +15,6 @@ class SaleItem extends Model
         'quantity',
         'price',
         'subtotal',
-        // All snapshot fields are explicitly made fillable
         'snapshot_name', 
         'snapshot_quantity',
         'snapshot_price',
@@ -29,22 +28,35 @@ class SaleItem extends Model
         'snapshot_price' => 'decimal:2',
     ];
 
-    // Relationship to Sale
-    // public function sale()
-    // {
-    //     return $this->belongsTo(Sale::class);
-    // }
+    // ✅ Relationship to Sale (needed!)
+    public function sale()
+    {
+        return $this->belongsTo(Sale::class);
+    }
 
-    // saleitem must have product to exist
+    // Relationship to Product
     public function product()
     {
         return $this->belongsTo(Product::class);
     }
-    
 
-    // Always use snapshot subtotal
     public function getSubtotalAttribute($value)
     {
         return $this->snapshot_price * $this->snapshot_quantity;
+    }
+
+    public function getNameAttribute()
+    {
+        return $this->product?->name ?? $this->snapshot_name ?? 'Deleted Product';
+    }
+
+    public function getPriceAttribute($value)
+    {
+        return $this->product?->price ?? $this->snapshot_price;
+    }
+
+    public function getQuantityAttribute($value)
+    {
+        return $this->product ? $value : $this->snapshot_quantity;
     }
 }

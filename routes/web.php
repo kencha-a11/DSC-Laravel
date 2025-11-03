@@ -3,6 +3,8 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\UserController;
 
 // login and logout must not change - something to do with backend session openning and closing
 Route::post('/api/login', [AuthController::class, 'login']);
@@ -16,11 +18,17 @@ Route::get('/categories', [CategoryController::class, 'index']);
 // Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'getDashboard']);
 
 // Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
+
+Route::get('/logs/time', [\App\Http\Controllers\TimeLogController::class, 'index']);
+Route::get('/logs/sales', [\App\Http\Controllers\SalesLogController::class, 'index']);
+
 Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
 
 Route::get('/logs/inventory', [\App\Http\Controllers\InventoryLogController::class, 'index']);
 Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
 
+Route::get('/dashboard/cashier', [\App\Http\Controllers\DashboardController::class, 'cashierDashboardData']);
+Route::get('/dashboard/admin', [\App\Http\Controllers\DashboardController::class, 'adminDashboardData']);
 
 
 // // If you prefer to put auth routes in web.php
