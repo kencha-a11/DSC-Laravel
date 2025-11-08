@@ -21,9 +21,11 @@ class SalesLogFactory extends Factory
         $actions = ['created', 'updated', 'deleted'];
 
         return [
-            'user_id' => User::inRandomOrder()->first()->id,
-            'sale_id' => Sale::inRandomOrder()->first()->id,
+            'user_id' => \App\Models\User::factory(),
+            'sale_id' => \App\Models\Sale::factory(),
             'action' => $this->faker->randomElement($actions),
+            'device_datetime' => $this->faker->dateTimeBetween('-1 week', 'now'),
+            'device_timezone' => $this->faker->randomElement(['Asia/Manila', 'UTC', 'America/New_York']),
         ];
     }
 }

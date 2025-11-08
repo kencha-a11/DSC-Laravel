@@ -17,6 +17,7 @@ return new class extends Migration
             $table->timestamp('start_time')->nullable();
             $table->timestamp('end_time')->nullable();
             $table->enum('status', ['logged_in', 'logged_out'])->default('logged_in');
+            $table->integer('duration')->nullable();
             $table->timestamps();
 
             $table->index(['user_id', 'status']); // optimize queries

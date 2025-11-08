@@ -21,8 +21,7 @@ class SaleFactory extends Factory
         return [
             'user_id' => \App\Models\User::factory(),
             'total_amount' => $this->faker->randomFloat(2, 50, 1000),
-            'created_at' => $created,
-            'updated_at' => $this->faker->dateTimeBetween($created, 'now'),
+
         ];
     }
 }

@@ -10,27 +10,17 @@ use Illuminate\Support\Facades\DB;
 
 class CategoryController extends Controller
 {
-    /**
-     * ✅ Fetch all categories (with optional pagination).
-     * This version preserves your existing functionality
-     * but adds pagination when the frontend requests it.
-     */
-    public function index(Request $request)
+
+    public function index()
     {
-        $perPage = $request->query('per_page');
+        $categories = Category::all();
+        Log::info($categories);
 
-        if ($perPage) {
-            $categories = Category::with('products')->paginate($perPage);
-        } else {
-            $categories = Category::with('products')->get();
-        }
-
-        return response()->json($categories);
+        return response()->json([
+            'data' => $categories
+        ]);
     }
 
-    /**
-     * ✅ Create a new category.
-     */
     public function store(Request $request)
     {
         $request->merge(['category_name' => trim($request->category_name)]);

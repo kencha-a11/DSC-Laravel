@@ -2,16 +2,21 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use App\Models\Sale;
+use App\Models\SaleItem;
 
 class SaleItemSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
-        \App\Models\SaleItem::factory()->count(20)->create();
+        // Attach 1–4 items per existing Sale
+        $sales = Sale::all();
+
+        foreach ($sales as $sale) {
+            SaleItem::factory(rand(1, 4))
+                ->for($sale, 'sale') // sets sale_id
+                ->create();
+        }
     }
 }

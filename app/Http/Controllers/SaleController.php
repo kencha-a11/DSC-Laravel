@@ -7,7 +7,9 @@ use Illuminate\Support\Facades\DB;
 use App\Models\Sale;
 use App\Models\Product;
 use App\Models\InventoryLog;
-
+use Illuminate\Support\Facades\Auth;
+use App\Models\SalesLog;
+use Illuminate\Support\Carbon;
 
 class SaleController extends Controller
 {
@@ -26,16 +28,41 @@ class SaleController extends Controller
             'items.*.product_id' => 'required|integer|exists:products,id',
             'items.*.quantity' => 'required|integer|min:1',
             'total_amount' => 'required|numeric|min:0',
+            'device_datetime' => 'nullable|date',
         ]);
 
-        return DB::transaction(function () use ($validated) {
-            // ✅ Create the sale record
+        return DB::transaction(function () use ($validated, $request) {
+            $userId = Auth::id() ?? 1;
+
+            // ✅ Use timezone applied by middleware
+            $userTimezone = config('app.user_timezone', config('app.timezone'));
+
+            // Normalize device_datetime to Carbon instance in user timezone
+            $deviceDatetime = $validated['device_datetime']
+                ? Carbon::parse($validated['device_datetime'], $userTimezone)
+                : Carbon::now($userTimezone);
+
+            // Convert to UTC for storage in DB (best practice)
+            $deviceDatetimeUtc = $deviceDatetime->copy()->setTimezone('UTC');
+
+            // ✅ Create Sale
             $sale = Sale::create([
-                'user_id' => auth()->id() ?? 1, // fallback for testing
+                'user_id' => $userId,
                 'total_amount' => $validated['total_amount'],
+                'device_datetime' => $deviceDatetimeUtc,
+                'device_timezone' => $userTimezone,
             ]);
 
-            // ✅ Loop through sale items
+            // ✅ Create Sales Log
+            SalesLog::create([
+                'user_id' => $userId,
+                'sale_id' => $sale->id,
+                'action' => 'created',
+                'device_datetime' => $deviceDatetimeUtc,
+                'device_timezone' => $userTimezone,
+            ]);
+
+            // ✅ Process Sale Items
             foreach ($validated['items'] as $item) {
                 $product = Product::where('id', $item['product_id'])
                     ->lockForUpdate()
@@ -45,10 +72,8 @@ class SaleController extends Controller
                     throw new \Exception("Not enough stock for product: {$product->name}");
                 }
 
-                // 🧮 Deduct product stock
                 $product->decrement('stock_quantity', $item['quantity']);
 
-                // 🧾 Create sale item record
                 $sale->saleItems()->create([
                     'product_id' => $product->id,
                     'quantity' => $item['quantity'],
@@ -59,12 +84,14 @@ class SaleController extends Controller
                     'snapshot_price' => $product->price,
                 ]);
 
-                // 📊 Log inventory deduction
+                // ✅ Record inventory deduction
                 InventoryLog::create([
-                    'user_id' => auth()->id() ?? 1,
+                    'user_id' => $userId,
                     'product_id' => $product->id,
                     'action' => 'deducted',
                     'quantity_change' => -$item['quantity'],
+                    'created_at' => $deviceDatetimeUtc,
+                    'updated_at' => $deviceDatetimeUtc,
                 ]);
             }
 
@@ -74,6 +101,8 @@ class SaleController extends Controller
             ], 201);
         });
     }
+
+
 
 
 

@@ -75,7 +75,6 @@ class UserController extends Controller
         return response()->json($formattedUsers);
     }
 
-
     public function store(Request $request)
     {
         $validated = $request->validate([

@@ -15,6 +15,7 @@ class InventoryLog extends Model
         'product_id',
         'action',
         'quantity_change',
+        'snapshot_name',
     ];
 
     // all users have inventory logs

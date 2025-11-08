@@ -21,6 +21,8 @@ return new class extends Migration
         });
     }
 
+    // original plan theres notification to manager
+
     /**
      * Reverse the migrations.
      */

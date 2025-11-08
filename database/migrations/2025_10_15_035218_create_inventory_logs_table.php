@@ -13,10 +13,18 @@ return new class extends Migration
     {
         Schema::create('inventory_logs', function (Blueprint $table) {
             $table->id();
+
+            // Keep cascade on user deletion
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('product_id')->constrained()->onDelete('cascade');
-            $table->enum('action', ['created', 'update', 'restock', 'deducted', 'deleted', 'adjusted'])->default('adjusted');
+
+            // Allow product_id to become null when product is deleted
+            $table->foreignId('product_id')->nullable()->constrained()->nullOnDelete();
+
+            $table->enum('action', ['created', 'update', 'restock', 'deducted', 'deleted', 'adjusted'])
+                ->default('adjusted');
+
             $table->integer('quantity_change')->nullable();
+            $table->string('snapshot_name')->nullable();
             $table->timestamps();
 
             $table->index(['user_id', 'product_id']);
