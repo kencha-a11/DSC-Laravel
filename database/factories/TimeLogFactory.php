@@ -8,26 +8,33 @@ use Carbon\Carbon;
 
 class TimeLogFactory extends Factory
 {
-
     public function definition(): array
     {
+        $timezone = 'Asia/Manila';
         $year = $this->faker->numberBetween(2023, 2025);
-        $start = $this->faker->dateTimeBetween("{$year}-01-01", "{$year}-12-31");
 
+        // Start time in Manila timezone
+        $start = Carbon::instance(
+            $this->faker->dateTimeBetween("{$year}-01-01", "{$year}-12-31")
+        )->setTimezone($timezone);
+
+        // Random user
         $user = User::inRandomOrder()->first() ?? User::factory()->create();
 
-        $end = Carbon::instance($start)->addMinutes($this->faker->numberBetween(15, 480));
+        // End time (shift duration 15–480 mins)
+        $end = $start->copy()->addMinutes($this->faker->numberBetween(15, 480));
 
-        $duration = $end->diffInMinutes($start); // Calculate duration in minutes
+        // Duration in minutes (Manila timezone)
+        $duration = $start->diffInMinutes($end);
 
         return [
             'user_id' => $user->id,
-            'start_time' => $start,
-            'end_time' => $end,
+            'start_time' => $start->copy()->setTimezone('UTC'),
+            'end_time' => $end->copy()->setTimezone('UTC'),
             'status' => 'logged_out',
             'duration' => $duration,
-            'created_at' => $start,
-            'updated_at' => $end,
+            'created_at' => $start->copy()->setTimezone('UTC'),
+            'updated_at' => $end->copy()->setTimezone('UTC'),
         ];
     }
 }
