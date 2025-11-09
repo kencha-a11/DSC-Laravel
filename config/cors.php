@@ -26,6 +26,9 @@ return [
         'http://127.0.0.1:3000',
         'http://127.0.0.1:5173',
         'http://127.0.0.1:5174',
+        'https://dsc-vite-react.vercel.app',
+        'https://dsc-vite-react-git-main-kencha-a11s-projects.vercel.app',
+        'https://dsc-vite-react-p3keh5zke-kencha-a11s-projects.vercel.app',
     ],
 
     'allowed_origins_patterns' => [],

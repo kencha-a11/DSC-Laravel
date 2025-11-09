@@ -83,6 +83,17 @@ Route::middleware('auth:sanctum')->prefix('logs')->group(function () {
     // Route::post('/time', [TimeLogController::class, 'store']);
 });
 
+/*
+|--------------------------------------------------------------------------
+| Deployment API Routes
+|--------------------------------------------------------------------------
+| Test render deployment
+|--------------------------------------------------------------------------
+*/
+
+Route::get('/test', function (){
+    return 'laravel is connected';
+});
 
 
 // // Example of grouping protected routes

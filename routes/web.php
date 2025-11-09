@@ -10,6 +10,18 @@ use App\Http\Controllers\UserController;
 Route::post('/api/login', [AuthController::class, 'login']);
 Route::post('/api/logout', [AuthController::class, 'logout'])->middleware('auth');
 
+/*
+|--------------------------------------------------------------------------
+| Deployment Web Routes
+|--------------------------------------------------------------------------
+| Test render deployment
+|--------------------------------------------------------------------------
+*/
+Route::get('/test', function (){
+    return 'laravel is connected';
+});
+
+
 Route::get('/categories', [CategoryController::class, 'index']);
 
 
@@ -29,6 +41,8 @@ Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
 
 Route::get('/dashboard/cashier/', [\App\Http\Controllers\UserDashboardController::class, 'cashierDashboardData']);
 Route::get('/dashboard/admin', [\App\Http\Controllers\DashboardController::class, 'adminDashboardData']);
+
+
 
 
 // // If you prefer to put auth routes in web.php
