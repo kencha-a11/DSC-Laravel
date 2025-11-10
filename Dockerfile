@@ -33,7 +33,7 @@ COPY nginx.conf /etc/nginx/sites-available/default
 # Expose HTTP port
 EXPOSE 80
 
-# ✅ Run migrations to create tables
+# Run migrations
 RUN php artisan migrate --force || true
 
 # Pre-cache Laravel assets and storage link

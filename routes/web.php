@@ -20,37 +20,32 @@ Route::post('/api/logout', [AuthController::class, 'logout'])->middleware('auth'
 
 Route::get('/diagnostics', function () {
     return response()->json([
-        // Application environment
-        'env' => app()->environment(),
-
-        // Database connection
-        'db_connection' => config('database.default'),
-
-        // Session configuration
-        'session_driver' => config('session.driver'),
-        'session_domain' => config('session.domain'),
-        'session_secure' => config('session.secure'),
-        'session_http_only' => config('session.http_only'),
-        'session_same_site' => config('session.same_site'),
-
-        // CORS configuration
-        'cors_allowed_origins' => config('cors.allowed_origins'),
-        'cors_allowed_origins_patterns' => config('cors.allowed_origins_patterns'),
-        'cors_allowed_methods' => config('cors.allowed_methods'),
-        'cors_allowed_headers' => config('cors.allowed_headers'),
-        'cors_supports_credentials' => config('cors.supports_credentials'),
-
-        // CSRF token from cookie
-        'csrf_cookie' => request()->cookie('XSRF-TOKEN'),
-
-        // Backend URL for sanity check
-        'app_url' => config('app.url'),
+        'env' => app()->environment() ?? 'not set',
+        'db_connection' => config('database.default') ?? 'not set',
+        'session_driver' => config('session.driver') ?? 'not set',
+        'session_domain' => config('session.domain') ?? 'not set',
+        'session_secure' => config('session.secure') ?? false,
+        'session_http_only' => config('session.http_only') ?? false,
+        'session_same_site' => config('session.same_site') ?? 'none',
+        'cors_allowed_origins' => config('cors.allowed_origins') ?? [],
+        'cors_allowed_origins_patterns' => config('cors.allowed_origins_patterns') ?? [],
+        'cors_allowed_methods' => config('cors.allowed_methods') ?? [],
+        'cors_allowed_headers' => config('cors.allowed_headers') ?? [],
+        'cors_supports_credentials' => config('cors.supports_credentials') ?? false,
+        'csrf_cookie' => request()->cookie('XSRF-TOKEN') ?? 'none',
+        'app_url' => config('app.url') ?? 'not set',
+        'php_version' => phpversion(),
     ]);
 });
 
-Route::get('/test', function () {
+Route::get('/response', function () {
     return response()->json('test is working');
 });
+
+Route::get('/display', function () {
+    return "backend conenction test";
+});
+
 
 
 
