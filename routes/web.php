@@ -6,9 +6,17 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
 
-// login and logout must not change - something to do with backend session openning and closing
-Route::post('/api/login', [AuthController::class, 'login']);
-Route::post('/api/logout', [AuthController::class, 'logout'])->middleware('auth');
+// CSRF cookie route (always noContent)
+Route::get('/sanctum/csrf-cookie', function () {
+    return response()->noContent();
+});
+
+// Auth routes with web middleware
+Route::middleware('web')->group(function () {
+    Route::post('/api/login', [AuthController::class, 'login']);
+    Route::post('/api/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+    Route::get('/api/user', [AuthController::class, 'user'])->middleware('auth:sanctum');
+});
 
 /*
 |--------------------------------------------------------------------------

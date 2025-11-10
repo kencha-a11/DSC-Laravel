@@ -1,3 +1,57 @@
-public/storage
-node_modules
-vendor
+# Node.js
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+yarn.lock
+
+# PHP
+vendor/
+composer.lock
+
+# Laravel
+/storage/*.key
+/storage/logs/*
+!/storage/logs/.gitkeep
+/bootstrap/cache/*
+!/bootstrap/cache/.gitkeep
+/public/hot
+/public/storage
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Tests & docs
+/tests
+phpunit.xml
+.phpunit.result.cache
+README.md
+CHANGELOG.md
+LICENSE
+*.md
+
+# Misc
+*.log
+*.sqlite
+*.sqlite-journal
+.env.backup
+.DS_Store

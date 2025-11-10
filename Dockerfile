@@ -1,44 +1,99 @@
-FROM php:8.2-fpm
+# ============================================
+# STAGE 1: Base PHP 8.2 with FPM + Extensions
+# ============================================
+FROM php:8.2-fpm AS base
 
+# Set working directory
 WORKDIR /var/www
 
-# Install system dependencies + Nginx
-RUN apt-get update && apt-get install -y \
-    git curl zip unzip libsqlite3-dev nginx supervisor \
-    && docker-php-ext-install pdo_sqlite
+# Install system dependencies and PHP extensions
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    zip \
+    unzip \
+    libsqlite3-dev \
+    nginx \
+    supervisor \
+    && docker-php-ext-install pdo_sqlite \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Copy project files
+# ============================================
+# STAGE 2: Application Setup
+# ============================================
+FROM base AS app
+
+# Copy project files (excluding .dockerignore files)
 COPY . .
 
-# Install PHP dependencies
-RUN composer install --no-dev --optimize-autoloader
+# Install PHP dependencies (production optimized)
+RUN composer install \
+    --no-dev \
+    --no-interaction \
+    --no-progress \
+    --prefer-dist \
+    --optimize-autoloader
 
-# ✅ Create SQLite database and set permissions
-RUN mkdir -p database && \
-    touch database/database.sqlite && \
-    chown -R www-data:www-data database && \
-    chmod -R 775 database
+# ============================================
+# STAGE 3: Laravel Setup & Permissions
+# ============================================
+FROM app AS laravel
 
-# Fix permissions for Laravel
-RUN mkdir -p storage/framework/views storage/framework/cache storage/framework/sessions storage/logs bootstrap/cache && \
-    chown -R www-data:www-data storage bootstrap/cache && \
-    chmod -R 775 storage bootstrap/cache
+# Create necessary directories
+RUN mkdir -p \
+    database \
+    storage/framework/cache/data \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/logs \
+    bootstrap/cache
 
-# Copy Nginx config
-COPY nginx.conf /etc/nginx/sites-available/default
+# Create SQLite database file
+RUN touch database/database.sqlite
 
-# Expose HTTP port
+# Set proper permissions
+RUN chown -R www-data:www-data \
+    database \
+    storage \
+    bootstrap/cache \
+    && chmod -R 775 \
+    database \
+    storage \
+    bootstrap/cache
+
+# Create storage link
+RUN php artisan storage:link || true
+
+# ============================================
+# STAGE 4: Configuration
+# ============================================
+
+# Copy Nginx configuration
+COPY docker/nginx.conf /etc/nginx/sites-available/default
+
+# Copy Supervisor configuration
+COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Remove default Nginx config
+RUN rm -f /etc/nginx/sites-enabled/default \
+    && ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+
+# Expose port 80
 EXPOSE 80
 
-# Run migrations
-RUN php artisan migrate --force || true
+# ============================================
+# Startup Script
+# ============================================
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
-# Pre-cache Laravel assets and storage link
-RUN php artisan storage:link || true
-RUN php artisan config:cache && php artisan route:cache && php artisan view:cache
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
 
-# Start PHP-FPM and Nginx
-CMD ["sh", "-c", "php-fpm -D && nginx -g 'daemon off;'"]
+# Start services
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

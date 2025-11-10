@@ -26,7 +26,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // ===========application===========
 
     // this check if user is logged in
-    Route::get('/user', [UserController::class, 'user']);
+    // Route::get('/user', [UserController::class, 'user']);
 
     // there are two types of dashboard cashier and manager
     Route::get('/dashboard/manager', [DashboardController::class, 'adminDashboardData']);
@@ -92,7 +92,7 @@ Route::middleware('auth:sanctum')->prefix('logs')->group(function () {
 */
 
 Route::get('/test', function (){
-    return 'laravel is connected';
+    return 'react is connected';
 });
 
 
