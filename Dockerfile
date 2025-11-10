@@ -16,8 +16,14 @@ COPY . .
 # Install PHP dependencies
 RUN composer install --no-dev --optimize-autoloader
 
+# ✅ Create SQLite database and set permissions
+RUN mkdir -p database && \
+    touch database/database.sqlite && \
+    chown -R www-data:www-data database && \
+    chmod -R 775 database
+
 # Fix permissions for Laravel
-RUN mkdir -p storage/framework/views storage/framework/cache storage/logs bootstrap/cache && \
+RUN mkdir -p storage/framework/views storage/framework/cache storage/framework/sessions storage/logs bootstrap/cache && \
     chown -R www-data:www-data storage bootstrap/cache && \
     chmod -R 775 storage bootstrap/cache
 
@@ -26,6 +32,9 @@ COPY nginx.conf /etc/nginx/sites-available/default
 
 # Expose HTTP port
 EXPOSE 80
+
+# ✅ Run migrations to create tables
+RUN php artisan migrate --force || true
 
 # Pre-cache Laravel assets and storage link
 RUN php artisan storage:link || true

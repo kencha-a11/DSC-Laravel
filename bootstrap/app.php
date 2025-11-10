@@ -20,7 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->api(prepend: [
             \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
             \App\Http\Middleware\ApplyUserTimezone::class, // ✅ your timezone middleware here
-            \App\Http\Middleware\CustomCors::class,
+            // \App\Http\Middleware\CustomCors::class,
         ]);
 
         // ✅ Global middleware
