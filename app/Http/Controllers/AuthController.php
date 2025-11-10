@@ -12,6 +12,19 @@ use Carbon\Carbon;
 
 class AuthController extends Controller
 {
+    /**
+     * Login user
+     * 
+     * 1️⃣ Validates credentials and optional timezone.
+     * 2️⃣ Attempts login using Laravel Auth.
+     * 3️⃣ Closes previous open TimeLogs.
+     * 4️⃣ Starts new TimeLog for current session.
+     * 5️⃣ Returns user and time log.
+     * 
+     * Note: CSRF is handled via Laravel Sanctum SPA middleware:
+     *  - Frontend must call /sanctum/csrf-cookie first.
+     *  - Axios should send X-XSRF-TOKEN header from cookie.
+     */
     public function login(Request $request)
     {
         $request->validate([
@@ -26,6 +39,7 @@ class AuthController extends Controller
         if (Auth::attempt($credentials)) {
             $user = Auth::user();
 
+            // Prevent login if account is deactivated
             if ($user->account_status === 'deactivated') {
                 Auth::logout();
                 throw ValidationException::withMessages([
@@ -33,10 +47,11 @@ class AuthController extends Controller
                 ]);
             }
 
+            // Regenerate session to prevent fixation attacks
             $request->session()->regenerate();
             $now = Carbon::now($timezone);
 
-            // Close previous open time logs and calculate duration
+            // Close any previous open TimeLogs for this user
             $ongoingLogs = TimeLog::where('user_id', $user->id)
                 ->whereNull('end_time')
                 ->get();
@@ -49,7 +64,7 @@ class AuthController extends Controller
                 $log->save();
             }
 
-            // Start new shift
+            // Start new TimeLog for this session
             $timeLog = TimeLog::create([
                 'user_id' => $user->id,
                 'start_time' => $now,
@@ -71,8 +86,16 @@ class AuthController extends Controller
         ]);
     }
 
-
-
+    /**
+     * Logout user
+     * 
+     * 1️⃣ Closes any open TimeLogs for this user.
+     * 2️⃣ Fires Laravel logout event.
+     * 3️⃣ Logs out user, invalidates session, regenerates CSRF token.
+     * 4️⃣ Clears session and XSRF-TOKEN cookies.
+     * 
+     * Note: Always call /sanctum/csrf-cookie first to ensure CSRF is valid for SPA requests.
+     */
     public function logout(Request $request)
     {
         $user = $request->user();
@@ -100,24 +123,27 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
+        // Remove cookies from browser to fully logout
         return response()
             ->json(['message' => 'Logout successful'])
             ->withCookie(cookie()->forget('laravel_session'))
             ->withCookie(cookie()->forget('XSRF-TOKEN'));
     }
 
-
-
+    /**
+     * Get currently authenticated user
+     * 
+     * Returns 401 if not authenticated.
+     * Explicitly includes role to ensure frontend can access it.
+     */
     public function user(Request $request)
     {
         if (!$request->user()) {
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        Log::info('authenticated user: ', Auth::user());
+        Log::info('authenticated user: ', Auth::user()->toArray);
 
-        // Explicitly include the role (even though it's in the model)
-        // to ensure it's visible in JSON responses
         return response()->json([
             'id' => $request->user()->id,
             'first_name' => $request->user()->first_name,
@@ -126,4 +152,21 @@ class AuthController extends Controller
             'role' => $request->user()->role,
         ]);
     }
+
+    /**
+     * CSRF Cookie
+     * 
+     * Optional: Only needed if you want a custom endpoint.
+     * Laravel Sanctum SPA provides this automatically:
+     * GET /sanctum/csrf-cookie
+     * 
+     * Example for custom use:
+     * return response()->json(['message' => 'CSRF cookie set'])
+     *      ->cookie('XSRF-TOKEN', csrf_token(), 0, '/', config('session.domain'), config('session.secure'), false, false, 'Strict');
+     */
+    // public function csrfCookie(Request $request)
+    // {
+    //     return response()->json(['message' => 'CSRF cookie set'])
+    //         ->cookie('XSRF-TOKEN', csrf_token(), 0, '/', config('session.domain'), config('session.secure'), false, false, 'Strict');
+    // }
 }

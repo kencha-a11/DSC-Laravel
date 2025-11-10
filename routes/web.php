@@ -5,11 +5,14 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserController;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Session;
+
 
 // CSRF cookie route (always noContent)
-Route::get('/sanctum/csrf-cookie', function () {
-    return response()->noContent();
-});
+Route::get('/sanctum/csrf-cookie', \Laravel\Sanctum\Http\Controllers\CsrfCookieController::class.'@show');
 
 // Auth routes with web middleware
 Route::middleware('web')->group(function () {
@@ -26,33 +29,115 @@ Route::middleware('web')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-Route::get('/diagnostics', function () {
-    return response()->json([
+
+Route::get('/diagnostics', function (Request $request) {
+    // ------------------------------
+    // Sessions info
+    // ------------------------------
+    $sessionsTableExists = Schema::hasTable(config('session.table', 'sessions'));
+    $sessionsCount = $sessionsTableExists
+        ? DB::table(config('session.table', 'sessions'))->count()
+        : 0;
+
+    // ------------------------------
+    // Migration status
+    // ------------------------------
+    $migrations = [];
+    try {
+        $ranMigrations = DB::table('migrations')->pluck('migration')->toArray();
+        $allMigrations = collect(glob(database_path('migrations') . '/*.php'))
+            ->map(fn($file) => pathinfo($file, PATHINFO_FILENAME))
+            ->toArray();
+
+        $pendingMigrations = array_diff($allMigrations, $ranMigrations);
+
+        $migrations = [
+            'ran' => $ranMigrations,
+            'pending' => array_values($pendingMigrations),
+        ];
+    } catch (\Exception $e) {
+        $migrations = [
+            'error' => 'Could not read migrations table: ' . $e->getMessage(),
+        ];
+    }
+
+    // ------------------------------
+    // Cross-domain & CSRF debug
+    // ------------------------------
+    $xsrfToken = $request->cookie('XSRF-TOKEN');
+    $sessionCookieName = config('session.cookie');
+    $sessionCookie = $request->cookie($sessionCookieName);
+
+    $allCookies = $request->cookies->all();
+    $origin = $request->header('Origin');
+    $isSecure = $request->isSecure();
+
+    $response = response()->json([
+        'timestamp' => now()->toDateTimeString(),
         'env' => app()->environment() ?? 'not set',
-        'db_connection' => config('database.default') ?? 'not set',
-        'session_driver' => config('session.driver') ?? 'not set',
-        'session_domain' => config('session.domain') ?? 'not set',
-        'session_secure' => config('session.secure') ?? false,
-        'session_http_only' => config('session.http_only') ?? false,
-        'session_same_site' => config('session.same_site') ?? 'none',
-        'cors_allowed_origins' => config('cors.allowed_origins') ?? [],
-        'cors_allowed_origins_patterns' => config('cors.allowed_origins_patterns') ?? [],
-        'cors_allowed_methods' => config('cors.allowed_methods') ?? [],
-        'cors_allowed_headers' => config('cors.allowed_headers') ?? [],
-        'cors_supports_credentials' => config('cors.supports_credentials') ?? false,
-        'csrf_cookie' => request()->cookie('XSRF-TOKEN') ?? 'none',
         'app_url' => config('app.url') ?? 'not set',
         'php_version' => phpversion(),
+        'db_connection' => config('database.default') ?? 'not set',
+        'db_database' => config('database.connections.' . config('database.default') . '.database') ?? 'not set',
+
+        // Session info
+        'session_driver' => config('session.driver'),
+        'session_cookie_name' => $sessionCookieName,
+        'session_cookie_value_truncated' => $sessionCookie ? substr($sessionCookie, 0, 20) . '...' : 'none',
+        'session_domain' => config('session.domain'),
+        'session_secure' => config('session.secure'),
+        'session_http_only' => config('session.http_only'),
+        'session_same_site' => config('session.same_site'),
+        'sessions_table_exists' => $sessionsTableExists,
+        'sessions_count' => $sessionsCount,
+
+        // Sanctum / CORS info
+        'sanctum_stateful_domains' => config('sanctum.stateful', []),
+        'cors_allowed_origins' => config('cors.allowed_origins', []),
+        'cors_allowed_origins_patterns' => config('cors.allowed_origins_patterns', []),
+        'cors_allowed_methods' => config('cors.allowed_methods', []),
+        'cors_allowed_headers' => config('cors.allowed_headers', []),
+        'cors_supports_credentials' => config('cors.supports_credentials', false),
+
+        // CSRF cookies
+        'csrf_cookie_value_truncated' => $xsrfToken ? substr($xsrfToken, 0, 20) . '...' : 'none',
+        'xsrf_cookie_received' => $request->hasCookie('XSRF-TOKEN'),
+        'all_cookies' => $allCookies,
+        'request_origin' => $origin ?? 'none',
+        'is_secure_request' => $isSecure,
     ]);
+
+    // ------------------------------
+    // Test cookies for different domain/samesite combinations
+    // ------------------------------
+    $cookieLifetime = 60; // minutes
+    $response->cookie(
+        'test_cookie_vercel',
+        'vercel_test_' . now()->timestamp,
+        $cookieLifetime,
+        '/',
+        '.vercel.app',   // shared across your frontend subdomains
+        true,            // Secure
+        false,           // httpOnly
+        false,           // raw
+        'None'           // SameSite=None
+    );
+
+    $response->cookie(
+        'test_cookie_backend',
+        'backend_test_' . now()->timestamp,
+        $cookieLifetime,
+        '/',
+        '.dsc-laravel.onrender.com', // backend domain
+        true,
+        false,
+        false,
+        'None'
+    );
+
+    return $response;
 });
 
-Route::get('/response', function () {
-    return response()->json('test is working');
-});
-
-Route::get('/display', function () {
-    return "backend conenction test";
-});
 
 
 
@@ -60,11 +145,9 @@ Route::get('/display', function () {
 
 Route::get('/categories', [CategoryController::class, 'index']);
 
-
 // data test
 // Route::get('/totalSales', [\App\Http\Controllers\DashboardController::class, 'totalSales']);
 // Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'getDashboard']);
-
 // Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
 
 Route::get('/logs/time', [\App\Http\Controllers\TimeLogController::class, 'index']);

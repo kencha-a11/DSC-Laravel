@@ -74,7 +74,6 @@ Route::middleware(['auth:sanctum'])->group(function () {
 
 });
 
-// Records module
 Route::middleware('auth:sanctum')->prefix('logs')->group(function () {
     Route::get('/time', [TimeLogController::class, 'index']);
     Route::get('/sales', [SalesLogController::class, 'index']);
@@ -83,17 +82,6 @@ Route::middleware('auth:sanctum')->prefix('logs')->group(function () {
     // Route::post('/time', [TimeLogController::class, 'store']);
 });
 
-/*
-|--------------------------------------------------------------------------
-| Deployment API Routes
-|--------------------------------------------------------------------------
-| Test render deployment
-|--------------------------------------------------------------------------
-*/
-
-Route::get('/test', function (){
-    return 'react is connected';
-});
 
 
 // // Example of grouping protected routes
