@@ -26,8 +26,8 @@ php artisan migrate --force --no-interaction || {
 }
 
 # Optional: Seed production data (uncomment if needed)
-# echo "🌱 Seeding production data..."
-php artisan db:seed --class=ProductionAccountSeeder || echo "⚠️ Seeder failed, continuing..."
+echo "🌱 Seeding production data..."
+php artisan db:seed --class=ProductionAccountSeeder --force || echo "⚠️ Seeder failed, continuing..."
 
 # ============================================
 # 3. Clear and cache configuration

@@ -142,7 +142,7 @@ class AuthController extends Controller
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        Log::info('authenticated user: ', Auth::user()->toArray);
+        // Log::info('authenticated user: ', Auth::user()->toArray());
 
         return response()->json([
             'id' => $request->user()->id,
