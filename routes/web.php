@@ -29,7 +29,7 @@ Route::middleware('web')->group(function () {
 |--------------------------------------------------------------------------
 */
 
-
+// Deployment Environment Testing
 Route::get('/diagnostics', function (Request $request) {
     // ------------------------------
     // Sessions info
@@ -137,11 +137,6 @@ Route::get('/diagnostics', function (Request $request) {
 
     return $response;
 });
-
-
-
-
-
 
 Route::get('/categories', [CategoryController::class, 'index']);
 
