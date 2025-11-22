@@ -171,7 +171,7 @@ return [
     */
 
     // 'secure' => env('SESSION_SECURE_COOKIE'),
-    'secure' => env('SESSION_SECURE_COOKIE', true),
+    'secure' => env('SESSION_SECURE_COOKIE', false), // okay local dev
 
     /*
     |--------------------------------------------------------------------------
@@ -202,7 +202,7 @@ return [
     */
 
     // 'same_site' => env('SESSION_SAME_SITE', 'lax'),
-    'same_site' => env('SESSION_SAME_SITE', 'none'),
+    'same_site' => env('SESSION_SAME_SITE', 'lax'),
 
     /*
     |--------------------------------------------------------------------------

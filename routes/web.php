@@ -10,15 +10,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Session;
 
+use Illuminate\Support\Facades\Log;
 
-// CSRF cookie route (always noContent)
+
+// CSRF cookie route (at root level)
 Route::get('/sanctum/csrf-cookie', \Laravel\Sanctum\Http\Controllers\CsrfCookieController::class.'@show');
 
-// Auth routes with web middleware
-Route::middleware('web')->group(function () {
-    Route::post('/api/login', [AuthController::class, 'login']);
-    Route::post('/api/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
-    Route::get('/api/user', [AuthController::class, 'user'])->middleware('auth:sanctum');
+// Auth routes - all use 'web' middleware for sessions
+Route::middleware(['web'])->group(function () {
+    Route::post('/login', [AuthController::class, 'login'])->name('login');
+    Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+    Route::get('/user', [AuthController::class, 'user'])->middleware('auth:sanctum');
 });
 
 /*
@@ -38,6 +40,9 @@ Route::get('/diagnostics', function (Request $request) {
     $sessionsCount = $sessionsTableExists
         ? DB::table(config('session.table', 'sessions'))->count()
         : 0;
+
+    // Current session data (if using cookie driver, this reads decrypted payload)
+    $currentSession = Session::all();
 
     // ------------------------------
     // Migration status
@@ -62,7 +67,7 @@ Route::get('/diagnostics', function (Request $request) {
     }
 
     // ------------------------------
-    // Cross-domain & CSRF debug
+    // CSRF & cookies
     // ------------------------------
     $xsrfToken = $request->cookie('XSRF-TOKEN');
     $sessionCookieName = config('session.cookie');
@@ -90,6 +95,7 @@ Route::get('/diagnostics', function (Request $request) {
         'session_same_site' => config('session.same_site'),
         'sessions_table_exists' => $sessionsTableExists,
         'sessions_count' => $sessionsCount,
+        'current_session_payload' => $currentSession, // <-- NEW
 
         // Sanctum / CORS info
         'sanctum_stateful_domains' => config('sanctum.stateful', []),
@@ -100,61 +106,118 @@ Route::get('/diagnostics', function (Request $request) {
         'cors_supports_credentials' => config('cors.supports_credentials', false),
 
         // CSRF cookies
-        'csrf_cookie_value_truncated' => $xsrfToken ? substr($xsrfToken, 0, 20) . '...' : 'none',
+        'csrf_cookie_value' => $xsrfToken,
         'xsrf_cookie_received' => $request->hasCookie('XSRF-TOKEN'),
         'all_cookies' => $allCookies,
         'request_origin' => $origin ?? 'none',
         'is_secure_request' => $isSecure,
+
+        // Migration info
+        'migrations' => $migrations,
     ]);
-
-    // ------------------------------
-    // Test cookies for different domain/samesite combinations
-    // ------------------------------
-    $cookieLifetime = 60; // minutes
-    $response->cookie(
-        'test_cookie_vercel',
-        'vercel_test_' . now()->timestamp,
-        $cookieLifetime,
-        '/',
-        '.vercel.app',   // shared across your frontend subdomains
-        true,            // Secure
-        false,           // httpOnly
-        false,           // raw
-        'None'           // SameSite=None
-    );
-
-    $response->cookie(
-        'test_cookie_backend',
-        'backend_test_' . now()->timestamp,
-        $cookieLifetime,
-        '/',
-        '.dsc-laravel.onrender.com', // backend domain
-        true,
-        false,
-        false,
-        'None'
-    );
 
     return $response;
 });
 
-Route::get('/categories', [CategoryController::class, 'index']);
+
+use Illuminate\Support\Str;
+
+Route::get('/debug-session', function (Request $request) {
+    // ------------------
+    // Browser cookies
+    // ------------------
+    $cookies = $request->cookies->all();
+
+    // ------------------
+    // Headers
+    // ------------------
+    $headers = $request->headers->all();
+
+    // ------------------
+    // Current session
+    // ------------------
+    $sessionId = $request->session()->getId();
+    $sessionData = $request->session()->all();
+
+    // CSRF token from current session
+    $csrfToken = $request->session()->token();
+
+    // ------------------
+    // DB session (if using database driver)
+    // ------------------
+    $dbSession = null;
+    $dbPayload = null;
+    if (config('session.driver') === 'database') {
+        $dbSession = DB::table(config('session.table', 'sessions'))
+            ->where('id', $sessionId)
+            ->first();
+
+        if ($dbSession) {
+            $dbPayload = @unserialize(base64_decode($dbSession->payload));
+        }
+    }
+
+    // ------------------
+    // Frontend CSRF token from header
+    // ------------------
+    $frontendCsrf = $request->header('x-xsrf-token');
+    $csrfMatch = $frontendCsrf === $csrfToken;
+
+    // ------------------
+    // Log for inspection
+    // ------------------
+    Log::info('Debug Session Route', [
+        'cookies' => $cookies,
+        'headers' => $headers,
+        'session_id' => $sessionId,
+        'session_data' => $sessionData,
+        'csrf_token_session' => $csrfToken,
+        'csrf_token_frontend' => $frontendCsrf,
+        'csrf_match' => $csrfMatch,
+        'db_session' => $dbSession,
+        'db_payload' => $dbPayload,
+    ]);
+
+    // ------------------
+    // JSON response
+    // ------------------
+    return response()->json([
+        'message' => $csrfMatch ? 'CSRF tokens match ✅' : 'CSRF token mismatch ❌',
+        'cookies' => $cookies,
+        'headers' => $headers,
+        'session_id' => $sessionId,
+        'session_data' => $sessionData,
+        'csrf_token_session' => $csrfToken,
+        'csrf_token_frontend' => $frontendCsrf,
+        'csrf_match' => $csrfMatch,
+        'db_session' => $dbSession,
+        'db_payload' => $dbPayload,
+        'tip' => $csrfMatch
+            ? 'Everything is fine!'
+            : 'Check if XSRF-TOKEN cookie exists and matches x-xsrf-token header. Also ensure withCredentials is true in Axios.',
+    ]);
+});
+
+
+
+
+// Route::get('/categories', [CategoryController::class, 'index']);
 
 // data test
 // Route::get('/totalSales', [\App\Http\Controllers\DashboardController::class, 'totalSales']);
 // Route::get('/dashboard', [\App\Http\Controllers\DashboardController::class, 'getDashboard']);
 // Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
 
-Route::get('/logs/time', [\App\Http\Controllers\TimeLogController::class, 'index']);
-Route::get('/logs/sales', [\App\Http\Controllers\SalesLogController::class, 'index']);
+// Route::get('/logs/time', [\App\Http\Controllers\TimeLogController::class, 'index']);
+// Route::get('/logs/sales', [\App\Http\Controllers\SalesLogController::class, 'index']);
 
-Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
+// Route::get('/products', [\App\Http\Controllers\ProductController::class, 'index']);
 
-Route::get('/logs/inventory', [\App\Http\Controllers\InventoryLogController::class, 'index']);
-Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
+// Route::get('/logs/inventory', [\App\Http\Controllers\InventoryLogController::class, 'index']);
+// Route::get('/users', [\App\Http\Controllers\UserController::class, 'index']);
 
-Route::get('/dashboard/cashier/', [\App\Http\Controllers\UserDashboardController::class, 'cashierDashboardData']);
-Route::get('/dashboard/admin', [\App\Http\Controllers\DashboardController::class, 'adminDashboardData']);
+// Route::get('/dashboard/cashier/', [\App\Http\Controllers\UserDashboardController::class, 'cashierDashboardData']);
+// Route::get('/dashboard/admin', [\App\Http\Controllers\DashboardController::class, 'adminDashboardData']);
 
 
 

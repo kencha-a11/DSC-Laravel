@@ -3,7 +3,8 @@
 return [
 
     // Routes where CORS is applied
-    'paths' => ['api/*', 'sanctum/csrf-cookie'],
+    // 'paths' => ['api/*', 'sanctum/csrf-cookie', 'debug-session', 'login', 'logout', 'user', 'dashboard/*'],
+    'paths' => ['*'],
 
     // Allow all HTTP methods
     'allowed_methods' => ['*'],
@@ -16,8 +17,9 @@ return [
         // Local backend origin
         'http://127.0.0.1:8000',
         'http://127.0.0.1:5173',
-        // (Optional) You can also add localhost if needed
-        'http://localhost:8000',
+
+        // (actual) This is what i use in local development
+        'http://localhost:8000',  
         'http://localhost:5173',
     ],
 

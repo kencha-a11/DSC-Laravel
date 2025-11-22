@@ -264,32 +264,53 @@ public function getLowStockProducts(Request $request)
 5. Logging is included to track query and mapping.
 */
 
-    private function salesTrendPerYear($year = null, $userId = null)
-    {
-        $year = $year ?: now()->year;
-        Log::info("Calculating sales trend for year: {$year}, user_id: " . ($userId ?? 'ALL'));
+private function salesTrendPerYear($year = null, $userId = null)
+{
+    $year = $year ?: now()->year;
+    Log::info("Calculating sales trend for year: {$year}, user_id: " . ($userId ?? 'ALL'));
 
-        $query = Sale::query()->whereYear('created_at', $year);
-        if ($userId) $query->where('user_id', $userId);
+    $query = Sale::query()->whereYear('created_at', $year);
+    if ($userId) $query->where('user_id', $userId);
 
+    // Detect database driver
+    $driver = DB::getDriverName();
+
+    if ($driver === 'pgsql') {
+        // PostgreSQL
         $salesTrendRaw = $query
-            ->selectRaw("strftime('%m', created_at) as month, SUM(total_amount) as total_sales")
+            ->selectRaw("EXTRACT(MONTH FROM created_at) AS month, SUM(total_amount) AS total_sales")
             ->groupBy('month')
             ->orderBy('month')
             ->get();
-
-        $trend = collect(range(1, 12))->map(function ($m) use ($salesTrendRaw) {
-            $monthName = date('F', mktime(0, 0, 0, $m, 10));
-            $sales = $salesTrendRaw->firstWhere('month', sprintf('%02d', $m))['total_sales'] ?? 0;
-            return [
-                'month' => $monthName,
-                'total_sales' => round($sales, 2),
-            ];
-        });
-
-        Log::info("Sales trend calculated for 12 months");
-        return $trend;
+    } elseif ($driver === 'sqlite') {
+        // SQLite
+        $salesTrendRaw = $query
+            ->selectRaw("strftime('%m', created_at) AS month, SUM(total_amount) AS total_sales")
+            ->groupBy('month')
+            ->orderBy('month')
+            ->get();
+    } else {
+        throw new \Exception("Unsupported database driver: {$driver}");
     }
+
+    // Map 1–12 months to full month names
+    $trend = collect(range(1, 12))->map(function ($m) use ($salesTrendRaw, $driver) {
+        $monthName = date('F', mktime(0, 0, 0, $m, 10));
+        
+        // SQLite strftime returns zero-padded strings, PG returns integers
+        $searchMonth = $driver === 'sqlite' ? sprintf('%02d', $m) : $m;
+
+        $sales = $salesTrendRaw->firstWhere('month', $searchMonth)?->total_sales ?? 0;
+        return [
+            'month' => $monthName,
+            'total_sales' => round($sales, 2),
+        ];
+    });
+
+    Log::info("Sales trend calculated for 12 months");
+    return $trend;
+}
+
 
     private function topSellingProducts($limit = 10, $userId = null)
     {

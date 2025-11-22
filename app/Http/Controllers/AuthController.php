@@ -17,6 +17,8 @@ class AuthController extends Controller
      */
     public function login(Request $request)
     {
+        // dd(session()->all());
+
         $request->validate([
             'email' => 'required|email',
             'password' => 'required',
@@ -92,10 +94,11 @@ class AuthController extends Controller
             foreach ($ongoingLogs as $log) {
                 $log->end_time = $now;
                 $log->status = 'logged_out';
-                $log->duration = Carbon::parse($log->start_time)->diffInMinutes($now);
+                $log->duration = round(Carbon::parse($log->start_time)->floatDiffInHours($now), 8);
                 $log->updated_at = $now;
                 $log->save();
             }
+
 
             event(new \Illuminate\Auth\Events\Logout('web', $user));
         }

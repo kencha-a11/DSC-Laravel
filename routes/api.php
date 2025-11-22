@@ -13,6 +13,8 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\UserDashboardController;
 
+use App\Http\Controllers\AuthController;
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -22,6 +24,8 @@ use App\Http\Controllers\UserDashboardController;
 */
 
 Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/user', [AuthController::class, 'user'])->middleware('auth:sanctum');
+
 
     // ===========application===========
 
