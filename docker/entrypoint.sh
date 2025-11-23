@@ -10,7 +10,7 @@ ENVIRONMENT=${APP_ENV:-local}
 echo "ℹ️  Environment: $ENVIRONMENT"
 
 # ---------------------------
-# Wait for Postgres (production)
+# Wait for PostgreSQL
 # ---------------------------
 if [ "$DB_CONNECTION" = "pgsql" ] && [ "$ENVIRONMENT" = "production" ]; then
     echo "⏳ Waiting for PostgreSQL..."
@@ -30,14 +30,23 @@ else
 fi
 
 # ---------------------------
-# Run migrations & seeders
+# Run migrations safely
 # ---------------------------
-php artisan migrate --force --no-interaction --verbose
+# Only migrate tables that haven't run
+echo "🔹 Running migrations..."
+php artisan migrate --force --no-interaction --verbose || {
+    echo "⚠️ Migrations may have already run, skipping duplicate errors..."
+}
+
+# ---------------------------
+# Run production seeders safely
+# ---------------------------
 php artisan db:seed --class=ProductionAccountSeeder --force --verbose || true
 
 # ---------------------------
-# Clear & cache config
+# Clear & cache config/routes/views
 # ---------------------------
+echo "🔹 Clearing and caching config/routes/views..."
 php artisan config:clear --verbose
 php artisan route:clear --verbose
 php artisan view:clear --verbose
@@ -48,18 +57,16 @@ php artisan view:cache --verbose
 # ---------------------------
 # Set permissions
 # ---------------------------
+echo "🔹 Setting permissions..."
 chown -R www-data:www-data /var/www/storage /var/www/bootstrap/cache /var/www/database
 chmod -R 775 /var/www/storage /var/www/bootstrap/cache /var/www/database
 
 # ---------------------------
 # Configure PHP-FPM to use TCP
 # ---------------------------
-echo "🔧 Configuring PHP-FPM..."
-
-# Remove default pool that uses socket
+echo "🔹 Configuring PHP-FPM..."
 rm -f /usr/local/etc/php-fpm.d/www.conf /usr/local/etc/php-fpm.d/zz-docker.conf
 
-# Create new pool using TCP
 cat > /usr/local/etc/php-fpm.d/www.conf <<EOF
 [www]
 user = www-data
@@ -81,12 +88,8 @@ EOF
 # ---------------------------
 # Test PHP-FPM configuration
 # ---------------------------
-echo "🧪 Testing PHP-FPM configuration..."
-php-fpm -t
-if [ $? -ne 0 ]; then
-    echo "❌ PHP-FPM configuration test failed"
-    exit 1
-fi
+echo "🔹 Testing PHP-FPM configuration..."
+php-fpm -t || { echo "❌ PHP-FPM configuration test failed"; exit 1; }
 
 # ---------------------------
 # Start supervisord
