@@ -81,36 +81,60 @@ class AuthController extends Controller
      */
     public function logout(Request $request)
     {
-        $user = $request->user();
-        $timezone = $request->input('timezone', 'Asia/Manila');
+        try {
+            $user = $request->user();
+            $timezone = $request->input('timezone', 'Asia/Manila');
 
-        if ($user) {
-            $now = Carbon::now($timezone);
+            if ($user) {
+                $now = Carbon::now($timezone);
 
-            $ongoingLogs = TimeLog::where('user_id', $user->id)
-                ->whereNull('end_time')
-                ->get();
+                // Close any ongoing time logs
+                $ongoingLogs = TimeLog::where('user_id', $user->id)
+                    ->whereNull('end_time')
+                    ->get();
 
-            foreach ($ongoingLogs as $log) {
-                $log->end_time = $now;
-                $log->status = 'logged_out';
-                $log->duration = round(Carbon::parse($log->start_time)->floatDiffInHours($now), 8);
-                $log->updated_at = $now;
-                $log->save();
+                foreach ($ongoingLogs as $log) {
+                    $log->end_time = $now;
+                    $log->status = 'logged_out';
+                    $log->duration = round(Carbon::parse($log->start_time)->floatDiffInHours($now), 8);
+                    $log->updated_at = $now;
+                    $log->save();
+                }
+
+                // Fire logout event (optional - can be removed if causing issues)
+                try {
+                    event(new \Illuminate\Auth\Events\Logout('web', $user));
+                } catch (\Exception $e) {
+                    Log::warning('Logout event failed', ['error' => $e->getMessage()]);
+                    // Continue with logout even if event fails
+                }
             }
 
+            // Perform logout
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
 
-            event(new \Illuminate\Auth\Events\Logout('web', $user));
+            return response()
+                ->json(['message' => 'Logout successful'])
+                ->withCookie(cookie()->forget('laravel_session'))
+                ->withCookie(cookie()->forget('XSRF-TOKEN'));
+        } catch (\Exception $e) {
+            Log::error('Logout failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // Still try to logout even if time log update fails
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+
+            return response()
+                ->json(['message' => 'Logout completed with warnings'])
+                ->withCookie(cookie()->forget('laravel_session'))
+                ->withCookie(cookie()->forget('XSRF-TOKEN'));
         }
-
-        Auth::guard('web')->logout();
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
-
-        return response()
-            ->json(['message' => 'Logout successful'])
-            ->withCookie(cookie()->forget('laravel_session'))
-            ->withCookie(cookie()->forget('XSRF-TOKEN'));
     }
 
     /**
