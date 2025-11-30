@@ -13,67 +13,72 @@ class UserController extends Controller
         return $request->user();
     }
 
-    public function index()
-    {
-        $users = User::with([
-            // Sort sales newest first
-            'sales' => fn($query) => $query->orderBy('created_at', 'desc'),
-            // Eager load saleItems
-            'sales.saleItems',
-            // Time logs newest first
-            'timeLogs' => fn($query) => $query->orderBy('start_time', 'desc')
-        ])->get();
+public function index()
+{
+    $users = User::with([
+        // Sort sales newest first
+        'sales' => fn($query) => $query->orderBy('created_at', 'desc'),
+        // Eager load saleItems
+        'sales.saleItems',
+        // Time logs newest first
+        'timeLogs' => fn($query) => $query->orderBy('start_time', 'desc'),
+    ])->get();
 
-        $formattedUsers = $users->map(function ($user) {
-            // Format time logs
-            $timeLogs = $user->timeLogs->map(function ($log) {
-                return [
-                    'id' => $log->id,
-                    'start_time' => $log->start_time,
-                    'end_time' => $log->end_time,
-                    'status' => $log->status,
-                    'current_status' => $log->status === 'logged_in' ? 'Active' : 'Inactive',
-                ];
-            });
-
-            // Latest time log
-            $latestLog = $timeLogs->first();
-
+    $formattedUsers = $users->map(function ($user) {
+        // Format time logs
+        $timeLogs = $user->timeLogs->map(function ($log) {
             return [
-                'id' => $user->id,
-                'first_name' => $user->first_name,
-                'last_name' => $user->last_name,
-                'name' => trim($user->first_name . ' ' . $user->last_name),
-                'email' => $user->email,
-                'phone_number' => $user->phone_number ?? null,
-
-                // Full time logs
-                'time_logs' => $timeLogs->all(),
-
-                // Latest time log for quick access
-                'latest_time_log' => $latestLog ?? ['current_status' => 'Inactive'],
-
-                // Sales logs
-                'sales_logs' => $user->sales->map(function ($sale) {
-                    return [
-                        'date' => $sale->created_at->format('F d, Y'),
-                        'time' => $sale->created_at->format('h:i A'),
-                        'total' => (string) $sale->total_amount,
-                        'items' => $sale->saleItems->sum('snapshot_quantity'),
-
-                        // 💡 Key fix: snapshot_name now matches React expectation
-                        'sale_items' => $sale->saleItems->map(fn($item) => [
-                            'snapshot_name' => $item->snapshot_name,
-                            'snapshot_quantity' => $item->snapshot_quantity,
-                            'snapshot_price' => (string) $item->snapshot_price,
-                        ])->all(),
-                    ];
-                })->all(),
+                'id' => $log->id,
+                'start_time' => $log->start_time,
+                'end_time' => $log->end_time,
+                'status' => $log->status,
+                'current_status' => $log->status === 'logged_in' ? 'Active' : 'Inactive',
             ];
         });
 
-        return response()->json($formattedUsers);
-    }
+        // Latest time log
+        $latestLog = $timeLogs->first();
+
+        return [
+            'id' => $user->id,
+            'first_name' => $user->first_name,
+            'last_name' => $user->last_name,
+            'name' => trim($user->first_name . ' ' . $user->last_name),
+            'email' => $user->email,
+            'phone_number' => $user->phone_number ?? null,
+
+            // ✅ User role (just the column)
+            'role' => $user->role ?? 'N/A',
+
+            // Full time logs
+            'time_logs' => $timeLogs->all(),
+
+            // Latest time log for quick access
+            'latest_time_log' => $latestLog ?? ['current_status' => 'Inactive'],
+
+            // Sales logs
+            'sales_logs' => $user->sales->map(function ($sale) {
+                return [
+                    'date' => $sale->created_at->format('F d, Y'),
+                    'time' => $sale->created_at->format('h:i A'),
+                    'total' => (string) $sale->total_amount,
+                    'items' => $sale->saleItems->sum('snapshot_quantity'),
+
+                    // Sale items
+                    'sale_items' => $sale->saleItems->map(fn($item) => [
+                        'snapshot_name' => $item->snapshot_name,
+                        'snapshot_quantity' => $item->snapshot_quantity,
+                        'snapshot_price' => (string) $item->snapshot_price,
+                    ])->all(),
+                ];
+            })->all(),
+        ];
+    });
+
+    return response()->json($formattedUsers);
+}
+
+
 
     public function store(Request $request)
     {

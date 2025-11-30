@@ -452,34 +452,38 @@ public function paginatedSalesLogs(Request $request): array
     /**
      * Format product data for API response
      */
-    private function formatProductData(Product $product): array
-    {
-        $stock = $product->stock_quantity;
-        $threshold = $product->low_stock_threshold;
+private function formatProductData(Product $product): array
+{
+    $stock = $product->stock_quantity;
+    $threshold = $product->low_stock_threshold;
 
-        [$status, $statusColor] = match (true) {
-            $stock == 0 => ['Out of Stock', 'text-red-600'],
-            $stock <= $threshold => ['Low Stock', 'text-yellow-500'],
-            default => ['In Stock', 'text-green-600'],
-        };
+    [$status, $statusColor] = match (true) {
+        $stock == 0 => ['Out of Stock', 'text-red-600'],
+        $stock <= $threshold => ['Low Stock', 'text-yellow-500'],
+        default => ['In Stock', 'text-green-600'],
+    };
 
-        return [
-            'id' => $product->id,
-            'product_name' => $product->name,
-            'stock' => $stock,
-            'price' => $product->price,
-            'categories' => $product->categories->map(fn($c) => [
-                'id' => $c->id,
-                'name' => $c->category_name
-            ])->toArray(),
-            'image' => $product->image_path
-                ? asset('images/products/' . $product->image_path)
-                : $this->getPlaceholderImage($product->name),
-            'status' => $status,
-            'statusColor' => $statusColor,
-            'low_stock_threshold' => $threshold,
-        ];
-    }
+    // Properly generate image URL
+    $image = $product->image_path
+        ? asset('storage/' . ltrim($product->image_path, '/'))
+        : $this->getPlaceholderImage($product->name);
+
+    return [
+        'id' => $product->id,
+        'product_name' => $product->name,
+        'stock' => $stock,
+        'price' => $product->price,
+        'categories' => $product->categories->map(fn($c) => [
+            'id' => $c->id,
+            'name' => $c->category_name
+        ])->toArray(),
+        'image' => $image,
+        'status' => $status,
+        'statusColor' => $statusColor,
+        'low_stock_threshold' => $threshold,
+    ];
+}
+
 
     /**
      * Generate placeholder image URL

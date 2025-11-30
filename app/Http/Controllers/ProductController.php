@@ -158,19 +158,55 @@ class ProductController extends Controller
      *  ➕ CREATE PRODUCT
      * ======================
      */
-    public function store(Request $request)
-    {
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'price' => 'required|numeric|min:0',
-            'stock_quantity' => 'required|integer|min:0',
-            'low_stock_threshold' => 'nullable|integer|min:0',
-            'category_ids' => 'nullable|array',
-            'category_ids.*' => 'exists:categories,id',
-            'image_path' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
-        ]);
+public function store(Request $request)
+{
+    Log::info('Store method called.', ['request' => $request->all()]);
 
-        $product = DB::transaction(function () use ($request, $validated) {
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'price' => 'required|numeric|min:0',
+        'stock_quantity' => 'required|integer|min:0',
+        'low_stock_threshold' => 'nullable|integer|min:0',
+        'category_ids' => 'nullable|array',
+        'category_ids.*' => 'exists:categories,id',
+        'image_path' => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
+    ]);
+
+    Log::info('Validation passed.', ['validated' => $validated]);
+
+    $product = DB::transaction(function () use ($request, $validated) {
+        Log::info('Transaction started.');
+
+        // Check if product exists
+        $product = Product::where('name', $validated['name'])->first();
+        Log::info('Checked if product exists.', ['product_found' => $product ? true : false]);
+
+        if ($product) {
+            Log::info('Existing product found. Incrementing stock.', ['product_id' => $product->id, 'current_stock' => $product->stock_quantity]);
+
+            // Product exists → add stock
+            $product->increment('stock_quantity', $validated['stock_quantity']);
+            Log::info('Stock incremented.', ['new_stock' => $product->stock_quantity + $validated['stock_quantity']]);
+
+            // Optionally update price
+            if ($product->price != $validated['price']) {
+                Log::info('Updating product price.', ['old_price' => $product->price, 'new_price' => $validated['price']]);
+                $product->update(['price' => $validated['price']]);
+            }
+
+            // Sync categories if provided
+            if (!empty($validated['category_ids'])) {
+                Log::info('Syncing categories.', ['category_ids' => $validated['category_ids']]);
+                $product->categories()->sync($validated['category_ids']);
+            }
+
+            // Inventory log
+            $this->logInventoryAction($product, 'restock', $validated['stock_quantity']);
+            Log::info('Logged inventory action: restock.', ['quantity' => $validated['stock_quantity']]);
+        } else {
+            Log::info('Product does not exist. Creating new product.');
+
+            // Product does not exist → create new
             $product = Product::create([
                 'name' => $validated['name'],
                 'price' => $validated['price'],
@@ -178,29 +214,40 @@ class ProductController extends Controller
                 'low_stock_threshold' => $validated['low_stock_threshold'] ?? 10,
                 'status' => 'stock',
             ]);
+            Log::info('New product created.', ['product_id' => $product->id]);
 
             if (!empty($validated['category_ids'])) {
+                Log::info('Syncing categories for new product.', ['category_ids' => $validated['category_ids']]);
                 $product->categories()->sync($validated['category_ids']);
             }
 
             if ($request->hasFile('image_path')) {
+                Log::info('Processing uploaded image for new product.');
                 $file = $request->file('image_path');
                 $filename = uniqid() . '_' . $file->getClientOriginalName();
                 $path = $file->storeAs('images/products', $filename, 'public');
                 $product->update(['image_path' => $path]);
+                Log::info('Image stored and updated for product.', ['image_path' => $path]);
             }
 
-            // ✅ Log creation with snapshot_name
+            // Inventory log
             $this->logInventoryAction($product, 'created', $product->stock_quantity);
+            Log::info('Logged inventory action: created.', ['quantity' => $product->stock_quantity]);
+        }
 
-            return $product;
-        });
+        Log::info('Transaction completed successfully.', ['product_id' => $product->id]);
+        return $product;
+    });
 
-        return response()->json([
-            'message' => 'Product created successfully!',
-            'product' => $product->load('categories'),
-        ], 201);
-    }
+    Log::info('Returning response.', ['product_id' => $product->id]);
+
+    return response()->json([
+        'message' => 'Product stored successfully!',
+        'product' => $product->load('categories'),
+    ], 201);
+}
+
+
 
     /**
      * ======================
@@ -416,33 +463,80 @@ class ProductController extends Controller
      *  🧾 INVENTORY LOGGER
      * ======================
      */
-    protected function logInventoryAction($product, $action, $quantityChange = 0, $snapshotName = null)
-    {
-        try {
-            $log = InventoryLog::create([
-                'user_id' => Auth::id(),
-                'product_id' => $product->id,
-                'action' => $action,
-                'quantity_change' => $quantityChange,
-                'snapshot_name' => $snapshotName ?? $product->name,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+protected function logInventoryAction($product, $action, $quantityChange = 0, $snapshotName = null)
+{
+    try {
+        // Allowed enum actions from your migration
+        $allowedActions = ['created', 'update', 'restock', 'deducted', 'deleted', 'adjusted'];
 
-            Log::info("🧮 Inventory action logged", [
-                'log_id' => $log->id,
-                'user_id' => Auth::id(),
-                'product_id' => $product->id,
-                'action' => $action,
-                'quantity_change' => $quantityChange,
-                'snapshot_name' => $snapshotName ?? $product->name,
-            ]);
-        } catch (\Exception $e) {
-            Log::error("❌ Failed to log inventory action", [
-                'error' => $e->getMessage(),
-                'product_id' => $product->id,
-                'action' => $action,
-            ]);
-        }
+        // Normalize action to lowercase first
+        $action = strtolower(trim($action));
+        
+        Log::info("🔍 [LOG ACTION] Input received", [
+            'product_id' => $product->id,
+            'raw_action' => $action,
+            'quantity_change' => $quantityChange,
+        ]);
+
+        // Map common terms to enum values
+        $actionMap = [
+            'created' => 'created',
+            'create' => 'created',
+            
+            'updated' => 'update',
+            'update' => 'update',
+            
+            'restocked' => 'restock',
+            'restock' => 'restock',
+            'added' => 'restock',
+            'add' => 'restock',
+            
+            'deducted' => 'deducted',
+            'deduct' => 'deducted',
+            'remove' => 'deducted',
+            
+            'deleted' => 'deleted',
+            'delete' => 'deleted',
+            
+            'adjusted' => 'adjusted',
+            'adjust' => 'adjusted',
+        ];
+
+        // Get the enum action or default to 'adjusted'
+        $enumAction = $actionMap[$action] ?? 'adjusted';
+        
+        Log::info("🎯 [LOG ACTION] Action mapped", [
+            'input_action' => $action,
+            'mapped_action' => $enumAction,
+        ]);
+
+        $log = InventoryLog::create([
+            'user_id' => Auth::id(),
+            'product_id' => $product->id,
+            'action' => $enumAction,
+            'quantity_change' => $quantityChange,
+            'snapshot_name' => $snapshotName ?? $product->name,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        Log::info("✅ [LOG ACTION] Inventory action logged successfully", [
+            'log_id' => $log->id,
+            'user_id' => Auth::id(),
+            'product_id' => $product->id,
+            'action' => $enumAction,
+            'quantity_change' => $quantityChange,
+            'snapshot_name' => $snapshotName ?? $product->name,
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error("❌ [LOG ACTION] Failed to log inventory action", [
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString(),
+            'product_id' => $product->id,
+            'action' => $action,
+        ]);
     }
+}
+
 }
